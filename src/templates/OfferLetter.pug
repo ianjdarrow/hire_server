@@ -1,0 +1,81 @@
+html
+head
+  link(rel='stylesheet', href=company.stylesheetUrl)
+body
+div.letter-content
+  img.logo(src=company.logoUrl)
+
+  p.offer-date #{offer.offerDate}
+  p.addresses #{offer.firstName} #{offer.lastName}
+  p.addresses #{offer.address1}, #{offer.address2}
+  p.addresses #{offer.city}, #{offer.state} #{offer.zip}
+
+  p.salutation Dear #{offer.firstName}:
+
+  p
+    |#{company.name}, a Delaware corporation (the "
+    b Company
+    |"), is pleased to offer you employment with the Company on the terms described below.
+
+  ol
+    li
+      u Position
+      |. You will start in a #{ position.isFullTime ? 'full-time' : 'part-time'} position as #{position.title}, reporting to the Company's #{position.supervisorTitle}. Your primary duties will be #{position.description}. By signing this letter, you confirm that you are under no contractual or other legal obligations that would prohibit you from performing your duties with the Company.
+    li
+      u Compensation
+        if position.hasBenefits
+          | &nbsp;and Employee Benefits
+      |. You will be paid a starting #{position.isSalaried ? 'salary' : 'wage'} at the rate of $#{offer.payRate.toLocaleString()} per #{position.isSalaried ? 'year' : 'hour'}, payable on the Company's regular payroll dates. #{ position.isSalaried ? 'This is an exempt position. ' : ''}
+      if position.hasBenefits
+          | &nbsp;As a regular employee of the Company you will be eligible to participate in a number of Company-sponsored benefits, which are described in the employee benefit summary that I have enclosed with this letter.
+    if position.hasEquityGrant
+      li
+        u Equity Grant
+        |. Subject to the approval of the Company's Board of Directors, you will be granted #{position.equityGrantType === 'option' ? 'an option to purchase' : 'a restricted stock award of'} #{offer.equityGrantAmount.toLocaleString()} shares of the Company's common stock. The #{position.equityGrantType} will be subject to the terms and conditions applicable to equity granted under the Company's #{company.stockPlanName}, as described in that plan and the applicable #{position.equityGrantType} agreement, which you will be required to sign. [25]% of the shares will vest on the [12]-month anniversary of your vesting commencement date and [1/48th] of the total shares will vest in monthly installments thereafter during continuous service, as described in the applicable #{position.equityGrantType === 'option' ? 'stock option' : 'restricted stock purchase'} agreement. The #{position.equityGrantType === 'option' ? 'exercise' : 'purchase'} price per share will be equal to the fair market value per share on the date the #{position.equityGrantType} is granted, as determined by the Company's Board of Directors in good faith. There is no guarantee that the Internal Revenue Service will agree with this value. You should consult with your own tax advisor concerning the tax risks associated with accepting #{position.equityGrantType} to purchase the Company's common stock.
+    li
+      u Confidential Information and Invention Assignment Agreement
+      |. Like all Company employees, you will be required, as a condition of your employment with the Company, to sign the Company's enclosed standard Confidential Information and Invention Assignment Agreement.
+    li
+      u Employment Relationship
+      |. Employment with the Company is for no specific period of time. Your employment with the Company will be "at will," meaning that either you or the Company may terminate your employment at any time and for any reason, with or without cause. Any contrary representations which may have been made to you are superseded by this offer. This is the full and complete agreement between you and the Company on this term. Although your job duties, title, compensation and benefits, as well as the Company's personnel policies and procedures, may change from time to time, the "at will" nature of your employment may only be changed in an express written agreement signed by you and the Company's Chief Executive Officer.
+    li
+      u Outside Activities
+      |. While you render services to the Company, you agree that you will not engage in any other employment, consulting or other business activity without the written consent of the Company.
+    li
+      u Taxes, Withholding and Required Deductions
+      |. All forms of compensation referred to in this letter are subject to all applicable taxes, withholding and any other deductions required by applicable law.
+    li
+      u Miscellaneous
+      |.
+      ol(type="a")
+        li
+          u Governing Law
+          |. The validity, interpretation, construction and performance of this letter, and all acts and transactions pursuant hereto and the rights and obligations of the parties hereto shall be governed, construed and interpreted in accordance with the laws of the #{company.state === 'DC' ? '' : 'state of'} #{company.stateFull}, without giving effect to principles of conflicts of law.
+        li
+          u Entire Agreement
+          |. This letter sets forth the entire agreement and understanding of the parties relating to the subject matter herein and supersedes all prior or contemporaneous discussions, understandings and agreements, whether oral or written, between them relating to the subject matter hereof.
+        li
+          u Counterparts
+          |. This letter may be executed in any number of counterparts, each of which when so executed and delivered shall be deemed an original, and all of which together shall constitute one and the same agreement. Execution of a facsimile copy will have the same force and effect as execution of an original, and a facsimile signature will be deemed an original and valid signature.
+        li
+          u Electronic Delivery
+          |. The Company may, in its sole discretion, decide to deliver any documents or notices related to this Agreement, securities of the Company or any of its affiliates or any other matter, including documents and/or notices required to be delivered to you by applicable securities law or any other law or the Company's Certificate of Incorporation or Bylaws by email or any other electronic means. You hereby consent to (i) conduct business electronically, (ii) receive such documents and notices by such electronic delivery and (iii) sign documents electronically and agree to participate through an on-line or electronic system established and maintained by the Company or a third party designated by the Company.
+
+  p If you wish to accept this offer, please sign and date both the enclosed duplicate original of this letter and the enclosed Confidential Information and Invention Assignment Agreement and return them to me. As required by law, your employment with the Company is also contingent upon your providing legal proof of your identity and authorization to work in the United States. If not accepted, this offer will expire at the close of business on #{offer.offerExpirationDate}.
+
+  p We look forward to having you join us no later than #{offer.lastStartDate}.
+
+  p Very truly yours,
+  p.signature-spacer
+    b #{company.name.toUpperCase()}
+  p.signatures #{'By: '.padEnd(40, '_')}
+
+  p.signatures Name: #{position.supervisorName}
+  p.signatures Title: #{position.supervisorTitle}
+
+  p.signature-spacer
+    b ACCEPTED AND AGREED:
+  p.signatures #{'_'.repeat(40)}
+  p.signatures #{offer.fullName}
+
+  p Date:

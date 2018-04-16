@@ -1,0 +1,54 @@
+body {
+  font-size: 1.3em;
+  font-family: -apple-system, BlinkMacSystemFont, “Roboto”, “Droid Sans”,
+    “Helvetica Neue”, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #fcfcfc;
+  color: #222;
+}
+.letter-content {
+  padding-top: 30px;
+  padding-bottom: 30px;
+  max-width: 65ch;
+  margin: 0 auto;
+}
+.logo {
+  float: right;
+  margin-bottom: 30px;
+  width: 30%;
+  min-width: 200px;
+  height: auto;
+}
+p,
+ol,
+ul {
+  text-align: justify;
+  line-height: 1.6em;
+}
+@media device and (max-width: 600px) {
+}
+ol,
+ul {
+  padding-left: 1em;
+}
+li {
+  margin-bottom: 1em;
+}
+p.offer-date {
+  padding-top: 60px;
+}
+p.addresses {
+  margin: 0;
+  padding: 0;
+}
+p.salutation {
+  margin-top: 2em;
+}
+p.signatures {
+  margin: 0;
+  padding: 0;
+}
+.signature-spacer {
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
