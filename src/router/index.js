@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.use(middleware.logger);
 router.get("/", controllers.getIndex);
+router.post("/generate-offer-letter", controllers.generateOfferLetter);
 
 module.exports = router;

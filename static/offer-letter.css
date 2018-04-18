@@ -19,13 +19,13 @@ body {
   min-width: 200px;
   height: auto;
 }
+@media device and (max-width: 600px) {
+}
 p,
 ol,
 ul {
   text-align: justify;
   line-height: 1.6em;
-}
-@media device and (max-width: 600px) {
 }
 ol,
 ul {
