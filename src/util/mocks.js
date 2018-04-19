@@ -13,7 +13,7 @@ const mockOfferLetter = {
     jobTitle: "Vice President, Engineering",
     payUnit: "year",
     payRate: 160000,
-    equityType: "option",
+    equityType: "options",
     equityAmount: 90617,
     vesting: "4/none/monthly",
     fulltime: "yes",
@@ -21,8 +21,8 @@ const mockOfferLetter = {
     supervisorName: "Scott Moreland",
     supervisorTitle: "Chief Technology Officer",
     supervisorEmail: "scott@g.co",
-    offerDate: "April 16, 2018",
-    respondBy: "April 31, 2018"
+    offerDate: "2018-04-16",
+    respondBy: "2018-04-31"
   }
 };
 

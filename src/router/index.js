@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.use(middleware.logger);
 router.get("/", controllers.getIndex);
+router.get("/offer-letter/:id", controllers.getOfferLetter);
 router.post("/generate-offer-letter", controllers.generateOfferLetter);
 
 module.exports = router;
