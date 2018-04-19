@@ -1,11 +1,14 @@
 const mockOfferLetter = {
   company: {
+    id: "a",
     name: "Summit Labs Inc.",
     logoUrl: `${process.env.ASSET_SERVER}/static/img/dark_logo_transparent.svg`,
     stylesheetUrl: `${process.env.ASSET_SERVER}/static/offer-letter.css`,
     stockPlanName: "2014 Equity Incentive Plan"
   },
   offer: {
+    id: "a",
+    status: "awaiting_company_signature",
     firstName: "Ben",
     lastName: "Weisel",
     fullName: "Ben Weisel",
@@ -18,11 +21,13 @@ const mockOfferLetter = {
     vesting: "4/none/monthly",
     fulltime: "yes",
     hasBenefits: "yes",
-    supervisorName: "Scott Moreland",
-    supervisorTitle: "Chief Technology Officer",
-    supervisorEmail: "scott@g.co",
+    supervisorName: "Ian Darrow",
+    supervisorTitle: "Founder",
+    supervisorEmail: "ian@g.co",
     offerDate: "2018-04-16",
-    respondBy: "2018-04-31"
+    offerDateFormatted: "April 16, 2018",
+    respondBy: "2018-04-31",
+    respondByFormatted: "April 31, 2018"
   }
 };
 
