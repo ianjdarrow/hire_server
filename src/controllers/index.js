@@ -2,11 +2,45 @@ const path = require("path");
 const pug = require("pug");
 const uuid = require("short-uuid");
 const format = require("date-fns/format");
+const dbPromise = require("../db").dbPromise;
 
 let offerLetters = {};
 const offerLetterTemplate = pug.compileFile(
   path.join(process.cwd(), "src/templates/OfferLetter.pug")
 );
+
+// const createUser = (req, res) => {
+//   const db = await dbPromise;
+//   if (!(req.body.email && req.body.password))
+//     return res.status(400).json({ error: "bad username or pass" });
+//   const exists = db.get(`SELECT FROM users WHERE email = ?`, req.body.email);
+//   if (exists.length > 0) return res.status(401).json({ error: "email taken" });
+//   db.run('INSERT INTO users(')
+// };
+
+const createCompany = async (req, res) => {
+  try {
+    const { email, password, companyName } = req.body;
+    if (!(email && password && companyName) || password.length < 8)
+      return res.status(400).json({ error: "Malformed request" });
+    console.log(email, password, companyName);
+    const db = await dbPromise;
+    const [company, user] = await Promise.all([
+      db.get("SELECT * FROM users WHERE email = ?", email),
+      db.get("SELECT * FROM companies WHERE name = ?", companyName)
+    ]);
+    if (company !== undefined)
+      res.status(401).json({ error: "Company is already registered" });
+    if (user !== undefined)
+      res.status(401).json({ error: "User is already registered" });
+    //
+    // NEXT: HASH PW AND STORE IN DB
+    //
+    res.send("ok");
+  } catch (err) {
+    return res.status(400).json({ error: "Malformed request" });
+  }
+};
 
 // initialize mock offer letter and add to janky store
 const options = require(path.join(process.cwd(), "src/util/mocks.js"))
@@ -20,7 +54,7 @@ const getIndex = (req, res) => {
 const getOfferLetter = (req, res) => {
   const id = req.params.id;
   if (!id in offerLetters)
-    return res.status(404).json({ error: "no such key" });
+    return res.status(404).json({ error: "no such document" });
   return res.json(offerLetters[id]);
 };
 const previewOfferLetter = async (req, res) => {
@@ -77,6 +111,8 @@ const signOfferLetter = async (req, res) => {
 
 module.exports = {
   getIndex,
+  createCompany,
+  // createUser,
   getOfferLetter,
   previewOfferLetter,
   generateOfferLetter,

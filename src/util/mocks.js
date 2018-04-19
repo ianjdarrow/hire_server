@@ -11,7 +11,6 @@ const mockOfferLetter = {
     status: "awaiting_company_signature",
     firstName: "Ben",
     lastName: "Weisel",
-    fullName: "Ben Weisel",
     email: "ben@google.co",
     jobTitle: "Vice President, Engineering",
     payUnit: "year",
