@@ -7,52 +7,75 @@ const dbPromise = sqlite.open(path.join(process.cwd(), "/src/db/database.db"), {
 
 const initDB = async () => {
   const db = await dbPromise;
-  const createUsersTable = `
-  CREATE TABLE IF NOT EXISTS users(
-    id INTEGER PRIMARY KEY,
-    email TEXT UNIQUE,
-    companyId INTEGER,
-    firstName TEXT,
-    lastName TEXT,
-    passwordHash TEXT
-  );`;
   const createCompaniesTable = `
-  CREATE TABLE IF NOT EXISTS companies(
-    id INTEGER PRIMARY KEY,
-    name TEXT,
-    logoUrl TEXT,
-    stylesheetUrl TEXT,
-    owner INTEGER,
-    stockPlanName TEXT
-  );`;
+    CREATE TABLE IF NOT EXISTS companies(
+      id INTEGER PRIMARY KEY,
+      created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+      name TEXT NOT NULL,
+      logoUrl TEXT,
+      stockPlanName TEXT,
+      accountLevel TEXT,
+      owner INTEGER,
+      isActive INTEGER
+    );`;
+  const createUsersTable = `
+    CREATE TABLE IF NOT EXISTS users(
+      id INTEGER PRIMARY KEY,
+      email TEXT UNIQUE,
+      firstName TEXT,
+      lastName TEXT,
+      title TEXT,
+      passwordHash TEXT,
+      hasRegistered INTEGER,
+      isAdministrator INTEGER,
+      companyId INTEGER,
+      FOREIGN KEY (companyId) REFERENCES companies(id)
+    );`;
   const createOffersTable = `
-  CREATE TABLE IF NOT EXISTS offers(
-    id INTEGER PRIMARY KEY,
-    status TEXT,
-    firstName TEXT,
-    lastName TEXT,
-    email TEXT,
-    jobTitle TEXT,
-    payUnit TEXT,
-    payRate INTEGER,
-    equityType TEXT,
-    equityAmount INTEGER,
-    vesting TEXT,
-    fulltime TEXT,
-    hasBenefits TEXT,
-    supervisorName TEXT,
-    supervisorEmail TEXT,
-    offerDate TEXT,
-    offerDateFormatted TEXT,
-    respondBy TEXT,
-    respondByFormatted TEXT,
-    next TEXT
-  );`;
+    CREATE TABLE IF NOT EXISTS offers(
+      id INTEGER PRIMARY KEY,
+      created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+      html TEXT,
+      htmlHash TEXT,
+      status TEXT,
+      firstName TEXT,
+      lastName TEXT,
+      email TEXT,
+      jobTitle TEXT,
+      payUnit TEXT,
+      payRate INTEGER,
+      equityType TEXT,
+      equityAmount INTEGER,
+      vesting TEXT,
+      fulltime TEXT,
+      hasBenefits TEXT,
+      supervisorName TEXT,
+      supervisorEmail TEXT,
+      offerDate TEXT,
+      offerDateFormatted TEXT,
+      respondBy TEXT,
+      respondByFormatted TEXT,
+      companyURL TEXT,
+      companySignature TEXT,
+      employeeURL TEXT,
+      employeeSignature TEXT
+    );`;
+  const createEventsTable = `
+    CREATE TABLE IF NOT EXISTS events(
+      id INTEGER PRIMARY KEY,
+      eventType TEXT,
+      eventTime DATETIME DEFAULT (datetime('now', 'localtime')),
+      eventURL TEXT,
+      documentId INTEGER,
+      companyId INTEGER NOT NULL
+    );
+  `;
 
   await Promise.all([
-    db.run(createUsersTable),
     db.run(createCompaniesTable),
-    db.run(createOffersTable)
+    db.run(createUsersTable),
+    db.run(createOffersTable),
+    db.run(createEventsTable)
   ]);
   console.log("Database initialized");
 };

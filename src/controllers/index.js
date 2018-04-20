@@ -1,8 +1,11 @@
+const format = require("date-fns/format");
+const jwt = require("jsonwebtoken");
 const path = require("path");
 const pug = require("pug");
 const uuid = require("short-uuid");
-const format = require("date-fns/format");
+
 const dbPromise = require("../db").dbPromise;
+const util = require("../util");
 
 let offerLetters = {};
 const offerLetterTemplate = pug.compileFile(
@@ -18,33 +21,106 @@ const offerLetterTemplate = pug.compileFile(
 //   db.run('INSERT INTO users(')
 // };
 
+const login = async (req, res) => {
+  const { email, password } = req.body;
+  if (!(email && password))
+    return res.status(400).json({ error: "Malformed request" });
+  const db = await dbPromise;
+  const user = await db.get(
+    `
+    SELECT
+      u.email,
+      u.passwordHash,
+      u.title,
+      u.firstName,
+      u.lastName,
+      u.isAdministrator,
+      c.id AS companyId,
+      c.name AS companyName
+      FROM users u
+      INNER JOIN companies c
+      ON u.companyId = c.id
+      WHERE u.email = ?;
+  `,
+    email
+  );
+  const validPassword = await util.comparePassword(
+    password,
+    user.passwordHash || ""
+  );
+  if (!(user && validPassword))
+    return res.status(401).json({ error: "Invalid email or password" });
+  const { passwordHash, ...userToken } = user;
+  const token = util.generateToken(userToken);
+  res.cookie("Authorization", token);
+  return res.json({ status: "ok" });
+};
+
 const createCompany = async (req, res) => {
   try {
     const { email, password, companyName } = req.body;
     if (!(email && password && companyName) || password.length < 8)
       return res.status(400).json({ error: "Malformed request" });
-    console.log(email, password, companyName);
     const db = await dbPromise;
-    const [company, user] = await Promise.all([
-      db.get("SELECT * FROM users WHERE email = ?", email),
-      db.get("SELECT * FROM companies WHERE name = ?", companyName)
-    ]);
-    if (company !== undefined)
-      res.status(401).json({ error: "Company is already registered" });
+    const user = await db.get("SELECT * FROM users WHERE email = ?", email);
     if (user !== undefined)
-      res.status(401).json({ error: "User is already registered" });
-    //
-    // NEXT: HASH PW AND STORE IN DB
-    //
-    res.send("ok");
+      return res.status(401).json({ error: "User is already registered" });
+    // TODO: verification for attempts to register known companies
+    // without company email address?
+    const pwHash = await util.hashPassword(password);
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedCompanyName = companyName.trim();
+    // create company
+    await db.run(
+      `INSERT INTO companies(
+        name,
+        accountLevel,
+        hasRegistered
+      ) VALUES (?, ?, ?)`,
+      normalizedCompanyName,
+      "trial",
+      1
+    );
+    // get company ID - all users are associated with a company, so we need this first
+    let companyId = await db.get(
+      `SELECT id FROM COMPANIES WHERE name = ?`,
+      normalizedCompanyName
+    );
+    // create user and associate with company
+    await db.run(
+      `INSERT INTO users(
+        email,
+        passwordHash,
+        companyID,
+        isAdministrator,
+        isActive
+      ) VALUES(?,?,?,?,?)`,
+      normalizedEmail,
+      pwHash,
+      companyId.id,
+      1,
+      1
+    );
+    // get user ID and set creator to company owner
+    let userId = await db.get(
+      `SELECT id FROM USERS WHERE email = ?`,
+      normalizedEmail
+    );
+    console.log(userId);
+    const setOwner = await db.run(
+      `UPDATE companies SET owner = ? WHERE id = ?`,
+      userId.id,
+      companyId.id
+    );
+    console.log(setOwner);
+    res.json({ company: companyName, owner: normalizedEmail });
   } catch (err) {
-    return res.status(400).json({ error: "Malformed request" });
+    return res.status(500).json({ error: "Unable to create company" });
   }
 };
 
 // initialize mock offer letter and add to janky store
-const options = require(path.join(process.cwd(), "src/util/mocks.js"))
-  .mockOfferLetter;
+const options = util.mockOfferLetter;
 const offerLetter = offerLetterTemplate(options);
 offerLetters[options.offer.id] = { html: offerLetter, options };
 
@@ -81,6 +157,7 @@ const generateOfferLetter = async (req, res) => {
   const id = uuid.uuid();
   customOptions.offer.id = id;
   offerLetters[id] = { html: offerLetter, options: customOptions };
+  console.log(id);
   return res.json({
     id
   });
@@ -99,6 +176,7 @@ const signOfferLetter = async (req, res) => {
     nextLetter.options.offer.id = newId;
     nextLetter.options.offer.status = "awaiting_employee_signature";
     offerLetters[newId] = nextLetter;
+    console.log(newId);
 
     return res.json({ status: "ok", id: nextLetter.options.offer.id });
   }
@@ -111,6 +189,7 @@ const signOfferLetter = async (req, res) => {
 
 module.exports = {
   getIndex,
+  login,
   createCompany,
   // createUser,
   getOfferLetter,
