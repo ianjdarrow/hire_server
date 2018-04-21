@@ -53,7 +53,7 @@ const login = async (req, res) => {
   const { passwordHash, ...userToken } = user;
   const token = util.generateToken(userToken);
   res.cookie("Authorization", token);
-  return res.json({ status: "ok" });
+  return res.json(userToken);
 };
 
 const createCompany = async (req, res) => {
@@ -74,12 +74,10 @@ const createCompany = async (req, res) => {
     await db.run(
       `INSERT INTO companies(
         name,
-        accountLevel,
-        hasRegistered
-      ) VALUES (?, ?, ?)`,
+        accountLevel
+      ) VALUES (?, ?)`,
       normalizedCompanyName,
-      "trial",
-      1
+      "trial"
     );
     // get company ID - all users are associated with a company, so we need this first
     let companyId = await db.get(
@@ -93,11 +91,13 @@ const createCompany = async (req, res) => {
         passwordHash,
         companyID,
         isAdministrator,
-        isActive
-      ) VALUES(?,?,?,?,?)`,
+        isActive,
+        hasRegistered
+      ) VALUES(?,?,?,?,?,?)`,
       normalizedEmail,
       pwHash,
       companyId.id,
+      1,
       1,
       1
     );
@@ -106,7 +106,6 @@ const createCompany = async (req, res) => {
       `SELECT id FROM USERS WHERE email = ?`,
       normalizedEmail
     );
-    console.log(userId);
     const setOwner = await db.run(
       `UPDATE companies SET owner = ? WHERE id = ?`,
       userId.id,
@@ -115,6 +114,7 @@ const createCompany = async (req, res) => {
     console.log(setOwner);
     res.json({ company: companyName, owner: normalizedEmail });
   } catch (err) {
+    console.log(err);
     return res.status(500).json({ error: "Unable to create company" });
   }
 };

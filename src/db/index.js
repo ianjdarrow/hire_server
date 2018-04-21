@@ -12,6 +12,8 @@ const initDB = async () => {
       id INTEGER PRIMARY KEY,
       created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
       name TEXT NOT NULL,
+      state TEXT,
+      stateFull TEXT,
       logoUrl TEXT,
       stockPlanName TEXT,
       accountLevel TEXT,
@@ -27,6 +29,7 @@ const initDB = async () => {
       title TEXT,
       passwordHash TEXT,
       hasRegistered INTEGER,
+      isActive INTEGER,
       isAdministrator INTEGER,
       companyId INTEGER,
       FOREIGN KEY (companyId) REFERENCES companies(id)
