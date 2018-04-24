@@ -26,7 +26,8 @@ const login = async (req, res) => {
       u.lastName,
       u.isAdministrator,
       c.id AS companyId,
-      c.name AS companyName
+      c.name AS companyName,
+      c.hasProvidedData
       FROM users u
       INNER JOIN companies c
       ON u.companyId = c.id
@@ -118,6 +119,73 @@ const createCompany = async (req, res) => {
   }
 };
 
+const getCompanyInfo = async (req, res) => {
+  const user = req.user;
+  // todo: handle user error
+  const db = await dbPromise;
+  const companyInfo = await db.get(
+    `
+    SELECT
+      c.name,
+      c.logo,
+      c.state,
+      c.stockPlanName,
+      c.hasProvidedData
+    FROM companies c
+    INNER JOIN users u
+    ON c.id = u.companyId
+    WHERE c.id = ?
+  `,
+    user.companyId
+  );
+  return res.json(companyInfo);
+};
+
+const getTemplateAutocomplete = async (req, res) => {
+  const user = req.user;
+  const term = req.body.term;
+  const db = await dbPromise;
+  const suggestions = await db.all(
+    `
+    SELECT
+      (firstName || ' ' || lastName) as name,
+      jobTitle
+    FROM offers
+    WHERE company LIKE ?
+    AND (firstName LIKE (? || '%') COLLATE NOCASE
+    OR lastName LIKE  (? || '%') COLLATE NOCASE
+    OR jobTitle LIKE (? || '%') COLLATE NOCASE)
+  `,
+    user.companyId,
+    term,
+    term,
+    term
+  );
+  console.log(suggestions);
+  res.json({ status: "ok" });
+};
+
+const setCompanyInfo = async (req, res) => {
+  const user = req.user;
+  const db = await dbPromise;
+  const { name, logo, state, stateFull, stockPlanName } = req.body.company;
+  const result = await db.run(
+    `
+    UPDATE companies
+      SET name=?, logo=?, state=?, stateFull=?, stockPlanName=?, hasProvidedData = ?
+      WHERE id = (SELECT companyId FROM users WHERE email=?)
+  `,
+    name,
+    logo,
+    state,
+    stateFull,
+    stockPlanName,
+    1,
+    user.email
+  );
+  res.json({ status: "ok" });
+};
+
 const getOfferLetter = async (req, res) => {
   const id = req.params.id;
   const db = await dbPromise;
@@ -131,7 +199,37 @@ const getOfferLetter = async (req, res) => {
     id
   );
   if (!letter) return res.status(404).json({ error: "no such document" });
-  return res.json(letter);
+  const { previewURL, companyURL, employeeURL, ...cleanLetter } = letter;
+  if (id === previewURL) cleanLetter.previewURL = previewURL;
+  if (id === companyURL) cleanLetter.companyURL = companyURL;
+  if (id === employeeURL) cleanLetter.employeeURL = employeeURL;
+  return res.json(cleanLetter);
+};
+
+const getPendingOffers = async (req, res) => {
+  const user = req.user;
+  const db = await dbPromise;
+  const offers = await db.all(
+    `
+    SELECT
+      (firstName || ' ' || lastName) AS name,
+      email,
+      jobTitle,
+      payRate,
+      equityType,
+      equityAmount,
+      status,
+      created,
+      previewURL,
+      offerDateFormatted,
+      respondByFormatted,
+      owner
+    FROM offers
+    WHERE company = ? AND status != 'done'
+  `,
+    user.companyId
+  );
+  res.json({ offers });
 };
 
 const generateOfferLetter = async (req, res) => {
@@ -144,13 +242,13 @@ const generateOfferLetter = async (req, res) => {
   const company = await db.get(
     `
     SELECT
-      c.id as companyId,
+      c.id as company,
       c.name as companyName,
       c.state,
       c.stateFull,
       c.logo,
       c.stockPlanName,
-      u.id as ownerId
+      u.id as owner
     FROM users u
     INNER JOIN companies c
     ON u.companyId = c.id
@@ -168,7 +266,6 @@ const generateOfferLetter = async (req, res) => {
     offerDateFormatted: format(offer.offerDate, "MMMM D, YYYY"),
     respondByFormatted: format(offer.respondBy, "MMMM D, YYYY")
   };
-  console.log("equity type:", offer.equityType);
   offer.html = offerLetterTemplate({ offer });
 
   // add to DB
@@ -305,6 +402,10 @@ module.exports = {
   login,
   checkToken,
   createCompany,
+  getCompanyInfo,
+  setCompanyInfo,
+  getPendingOffers,
+  getTemplateAutocomplete,
   getOfferLetter,
   generateOfferLetter,
   confirmOfferLetter,

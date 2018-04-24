@@ -12,8 +12,8 @@ const initDB = async () => {
       id INTEGER PRIMARY KEY,
       created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
       name TEXT NOT NULL,
-      state TEXT,
-      stateFull TEXT,
+      state TEXT DEFAULT 'DE',
+      stateFull TEXT default 'Delaware',
       logo TEXT,
       stockPlanName TEXT,
       accountLevel TEXT,
@@ -69,13 +69,14 @@ const initDB = async () => {
       employeeURL TEXT,
       employeeSignature TEXT
     );`;
-  const createEventsTable = `
-    CREATE TABLE IF NOT EXISTS events(
+  const createOfferEventsTable = `
+    CREATE TABLE IF NOT EXISTS offerEvents(
       id INTEGER PRIMARY KEY,
       eventType TEXT,
       eventTime DATETIME DEFAULT (datetime('now', 'localtime')),
       eventURL TEXT,
       userId INTEGER,
+      userIpAddress TEXT,
       documentId INTEGER,
       companyId INTEGER NOT NULL
     );
@@ -85,7 +86,7 @@ const initDB = async () => {
     db.run(createCompaniesTable),
     db.run(createUsersTable),
     db.run(createOffersTable),
-    db.run(createEventsTable)
+    db.run(createOfferEventsTable)
   ]);
   console.log("Database initialized");
 };
