@@ -16,13 +16,13 @@ mixin oneYearNoCliff
 body
 div.letter-content.content
   div.letter-header
-    img.logo(src=company.logoUrl)
+    img.logo(src=offer.logo)
     p.offer-date #{offer.offerDateFormatted}
 
   p.salutation Dear #{offer.firstName}:
 
   p
-    |#{company.name}, a Delaware corporation (the "
+    |#{offer.companyName}, a #{offer.stateFull} corporation (the "
     b Company
     |"), is pleased to offer you employment with the Company on the terms described below.
 
@@ -40,7 +40,7 @@ div.letter-content.content
     if offer.equityType !== 'none'
       li
         u Equity Grant
-        |. Subject to the approval of the Company's Board of Directors, you will be granted #{offer.equityType === 'option' ? 'an option to purchase' : 'a right to purchase'} #{offer.equityAmount.toLocaleString('en')} shares of the Company's common stock. The #{offer.equityType} will be subject to the terms and conditions applicable to equity granted under the Company's #{company.stockPlanName}, as described in that plan and the applicable #{offer.equityType} agreement, which you will be required to sign.&nbsp;
+        |. Subject to the approval of the Company's Board of Directors, you will be granted #{offer.equityType === 'option' ? 'an option to purchase' : 'a right to purchase'} #{offer.equityAmount.toLocaleString('en')} shares of the Company's common stock. The #{offer.equityType} will be subject to the terms and conditions applicable to equity granted under the Company's #{offer.stockPlanName}, as described in that plan and the applicable #{offer.equityType} agreement, which you will be required to sign.&nbsp;
         if offer.vesting === 'standard'
           +standard
         if offer.vesting === '4/none/monthly'
@@ -70,7 +70,7 @@ div.letter-content.content
       ol(type="a")
         li
           u Governing Law
-          |. The validity, interpretation, construction and performance of this letter, and all acts and transactions pursuant hereto and the rights and obligations of the parties hereto shall be governed, construed and interpreted in accordance with the laws of the #{company.state === 'DC' ? '' : 'state of'} #{company.stateFull}, without giving effect to principles of conflicts of law.
+          |. The validity, interpretation, construction and performance of this letter, and all acts and transactions pursuant hereto and the rights and obligations of the parties hereto shall be governed, construed and interpreted in accordance with the laws of the #{offer.state === 'DC' ? '' : 'state of'} #{offer.stateFull}, without giving effect to principles of conflicts of law.
         li
           u Entire Agreement
           |. This letter sets forth the entire agreement and understanding of the parties relating to the subject matter herein and supersedes all prior or contemporaneous discussions, understandings and agreements, whether oral or written, between them relating to the subject matter hereof.

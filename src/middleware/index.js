@@ -9,16 +9,16 @@ const logger = (req, res, next) => {
 };
 
 const checkToken = async (req, res, next) => {
-  const token = req.cookies["Authorization"];
+  const token = req.body.user && req.body.user.token;
   if (token) {
     const validToken = await util.checkToken(token);
     if (validToken) {
-      const { iat, exp, ...strippedToken } = validToken;
-      const newToken = util.generateToken(strippedToken);
-      res.cookie("Authorization", newToken);
-      req.user = strippedToken;
+      const { iat, exp, ...tokenClaims } = validToken;
+      const newToken = util.generateToken(tokenClaims);
+      req.user = { token: newToken, ...tokenClaims };
     }
   }
+  await new Promise(res => setTimeout(res, 50));
   next();
 };
 

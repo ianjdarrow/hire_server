@@ -14,11 +14,12 @@ const initDB = async () => {
       name TEXT NOT NULL,
       state TEXT,
       stateFull TEXT,
-      logoUrl TEXT,
+      logo TEXT,
       stockPlanName TEXT,
       accountLevel TEXT,
       owner INTEGER,
-      isActive INTEGER
+      isActive INTEGER,
+      hasProvidedData INTEGER DEFAULT 0
     );`;
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users(
@@ -37,6 +38,9 @@ const initDB = async () => {
   const createOffersTable = `
     CREATE TABLE IF NOT EXISTS offers(
       id INTEGER PRIMARY KEY,
+      company INTEGER,
+      companyName TEXT,
+      owner INTEGER,
       created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
       html TEXT,
       htmlHash TEXT,
@@ -53,11 +57,13 @@ const initDB = async () => {
       fulltime TEXT,
       hasBenefits TEXT,
       supervisorName TEXT,
+      supervisorTitle TEXT,
       supervisorEmail TEXT,
       offerDate TEXT,
       offerDateFormatted TEXT,
       respondBy TEXT,
       respondByFormatted TEXT,
+      previewURL TEXT,
       companyURL TEXT,
       companySignature TEXT,
       employeeURL TEXT,
@@ -69,6 +75,7 @@ const initDB = async () => {
       eventType TEXT,
       eventTime DATETIME DEFAULT (datetime('now', 'localtime')),
       eventURL TEXT,
+      userId INTEGER,
       documentId INTEGER,
       companyId INTEGER NOT NULL
     );
