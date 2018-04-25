@@ -24,5 +24,6 @@ router.get("/template-autocomplete", controllers.getTemplateAutocomplete);
 router.get("/confirm-offer-letter/:id", controllers.confirmOfferLetter);
 router.get("/offer-letter/:id", controllers.getOfferLetter);
 router.post("/sign-offer-letter", controllers.signOfferLetter);
+router.delete("/offer-letter/:id", controllers.deleteOfferLetter);
 
 module.exports = router;

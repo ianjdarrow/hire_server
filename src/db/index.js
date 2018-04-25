@@ -29,6 +29,7 @@ const initDB = async () => {
       lastName TEXT,
       title TEXT,
       passwordHash TEXT,
+      resetToken TEXT,
       hasRegistered INTEGER,
       isActive INTEGER,
       isAdministrator INTEGER,
@@ -81,8 +82,8 @@ const initDB = async () => {
       eventURL TEXT,
       userId INTEGER,
       userIpAddress TEXT,
-      documentId INTEGER NOT NULL,
-      companyId INTEGER NOT NULL
+      FOREIGN KEY (documentId) REFERENCES offers(id),
+      FOREIGN KEY (companyId) REFERENCES companies(id)
     );
   `;
 

@@ -217,7 +217,7 @@ const getOfferLetter = async (req, res) => {
     `,
     3,
     "offer_letter_viewed",
-    req.originalURL,
+    req.originalUrl,
     letter.id,
     letter.html,
     util.crypto.hash(letter.html),
@@ -237,6 +237,7 @@ const getPendingOffers = async (req, res) => {
   const offers = await db.all(
     `
     SELECT
+      id,
       (firstName || ' ' || lastName) AS name,
       email,
       jobTitle,
@@ -366,7 +367,7 @@ const generateOfferLetter = async (req, res) => {
   `,
     2,
     "offer_letter_created",
-    req.originalURL,
+    req.originalUrl,
     offer.html,
     util.crypto.hash(offer.html),
     offer.owner,
@@ -423,7 +424,7 @@ const confirmOfferLetter = async (req, res) => {
   `,
     1,
     "offer_letter_sent_to_company",
-    req.originalURL,
+    req.originalUrl,
     letter.html,
     util.crypto.hash(letter.html),
     user.id,
@@ -437,7 +438,7 @@ const confirmOfferLetter = async (req, res) => {
 
 const signOfferLetter = async (req, res) => {
   // add signature to master document object and advance status
-  const { id, companyId, html, signature, status } = req.body;
+  const { id, documentId, companyId, html, signature, status } = req.body;
   // TODO: validate fields
   const db = await dbPromise;
   if (status === "awaiting_company_signature") {
@@ -451,7 +452,7 @@ const signOfferLetter = async (req, res) => {
       "awaiting_employee_signature",
       signature,
       uuid.uuid(),
-      id
+      documentId
     );
     await db.run(
       `
@@ -468,7 +469,7 @@ const signOfferLetter = async (req, res) => {
     `,
       1,
       "offer_letter_signed_company",
-      req.originalURL,
+      req.originalUrl,
       html,
       util.crypto.hash(html),
       "fake address",
@@ -487,7 +488,7 @@ const signOfferLetter = async (req, res) => {
     `,
       "done",
       signature,
-      id
+      documentId
     );
     await db.run(
       `
@@ -504,7 +505,7 @@ const signOfferLetter = async (req, res) => {
     `,
       1,
       "offer_letter_signed_employee",
-      req.originalURL,
+      req.originalUrl,
       html,
       util.crypto.hash(html),
       "fake address",
@@ -520,7 +521,7 @@ const getRecentEvents = async (req, res) => {
   const db = await dbPromise;
   const results = await db.all(
     `
-    SELECT
+    SELECT DISTINCT
       o.firstName,
       o.lastName,
       o.email,
@@ -530,10 +531,10 @@ const getRecentEvents = async (req, res) => {
       e.eventType,
       e.eventTime,
       e.id as eventId
-    FROM offers o
-    INNER JOIN offerEvents e
-    ON e.companyId = o.company
-    WHERE o.company = ?
+    FROM offerEvents e
+    INNER JOIN offers o
+    ON o.id = e.documentId
+    WHERE e.companyId = ?
     AND e.priority < 2
     ORDER BY e.eventTime DESC
     LIMIT 10;
@@ -541,6 +542,28 @@ const getRecentEvents = async (req, res) => {
     user.companyId
   );
   return res.json(results);
+};
+
+const deleteOfferLetter = async (req, res) => {
+  const user = req.user;
+  const offerId = req.params.id;
+  if (!offerId || !user)
+    return res
+      .status(400)
+      .json({ error: "must specify offerId as query string" });
+  const db = await dbPromise;
+  const request = await db.run(
+    `
+    DELETE FROM offers
+    WHERE id = ?
+    AND company = ?
+    AND status = 'preview'
+  `,
+    offerId,
+    user.companyId
+  );
+  // todo: check if actually deleted
+  res.json({ status: "ok" });
 };
 
 module.exports = {
@@ -555,5 +578,6 @@ module.exports = {
   generateOfferLetter,
   confirmOfferLetter,
   signOfferLetter,
+  deleteOfferLetter,
   getRecentEvents
 };

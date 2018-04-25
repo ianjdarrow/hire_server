@@ -45,7 +45,7 @@ const checkToken = async (req, res, next) => {
       req.user = { token: newToken, ...claims };
     }
   }
-  await new Promise(res => setTimeout(res, 100));
+  // await new Promise(res => setTimeout(res, 100));
   next();
 };
 
