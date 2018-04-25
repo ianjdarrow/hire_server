@@ -35,6 +35,8 @@ const login = async (req, res) => {
   `,
     email
   );
+  if (!user)
+    return res.status(401).json({ error: "Invalid email or password" });
   const validPassword = await util.comparePassword(
     password,
     user.passwordHash || ""

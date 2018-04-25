@@ -10,7 +10,7 @@ const initDB = async () => {
   const createCompaniesTable = `
     CREATE TABLE IF NOT EXISTS companies(
       id INTEGER PRIMARY KEY,
-      created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+      created TIMESTAMP DEFAULT (datetime('now')),
       name TEXT NOT NULL,
       state TEXT DEFAULT 'DE',
       stateFull TEXT default 'Delaware',
@@ -43,7 +43,7 @@ const initDB = async () => {
       companyName TEXT,
       owner INTEGER,
       cancelled INTEGER DEFAULT 0,
-      created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+      created TIMESTAMP DEFAULT (datetime('now')),
       html TEXT,
       htmlHash TEXT,
       status TEXT,
@@ -76,7 +76,7 @@ const initDB = async () => {
       id INTEGER PRIMARY KEY,
       priority INTEGER,
       eventType TEXT,
-      eventTime DATETIME DEFAULT (datetime('now', 'localtime')),
+      eventTime DATETIME DEFAULT (datetime('now')),
       eventData TEXT,
       eventDataHash TEXT,
       eventURL TEXT,

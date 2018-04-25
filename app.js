@@ -19,7 +19,7 @@ app.use(cors());
 
 app.use("/static", express.static("static"));
 const router = require("./src/router");
-app.use(process.env.BASE_API_ROUTE, router);
+app.use(process.env.BASE_API_ROUTE || "/", router);
 
 app.listen(3000, () => {
   console.log("Listening on 3000");
