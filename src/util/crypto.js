@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const IV_LENGTH = 16;
 
-function encrypt(text) {
+const encrypt = text => {
   const version = process.env.ENCRYPTION_KEY_VERSION;
   const ENCRYPTION_KEY = process.env[`ENCRYPTION_KEY_${version}`];
   let iv = crypto.randomBytes(IV_LENGTH);
@@ -17,9 +17,9 @@ function encrypt(text) {
   return (
     version + ":" + iv.toString("base64") + ":" + encrypted.toString("base64")
   );
-}
+};
 
-function decrypt(text) {
+const decrypt = text => {
   let textParts = text.split(":");
   let version = textParts.shift();
   const ENCRYPTION_KEY = process.env[`ENCRYPTION_KEY_${version}`];
@@ -35,6 +35,13 @@ function decrypt(text) {
   decrypted = Buffer.concat([decrypted, decipher.final()]);
 
   return decrypted.toString();
-}
+};
 
-module.exports = { decrypt, encrypt };
+const hash = text => {
+  return crypto
+    .createHash("sha256")
+    .update(text, "utf8")
+    .digest("base64");
+};
+
+module.exports = { decrypt, encrypt, hash };

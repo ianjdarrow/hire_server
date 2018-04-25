@@ -40,6 +40,7 @@ const checkToken = token => {
 };
 
 module.exports = {
+  crypto,
   hashPassword,
   comparePassword,
   generateToken,

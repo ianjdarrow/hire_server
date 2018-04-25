@@ -41,6 +41,7 @@ const initDB = async () => {
       company INTEGER,
       companyName TEXT,
       owner INTEGER,
+      cancelled INTEGER DEFAULT 0,
       created TIMESTAMP DEFAULT (datetime('now', 'localtime')),
       html TEXT,
       htmlHash TEXT,
@@ -72,12 +73,15 @@ const initDB = async () => {
   const createOfferEventsTable = `
     CREATE TABLE IF NOT EXISTS offerEvents(
       id INTEGER PRIMARY KEY,
+      priority INTEGER,
       eventType TEXT,
       eventTime DATETIME DEFAULT (datetime('now', 'localtime')),
+      eventData TEXT,
+      eventDataHash TEXT,
       eventURL TEXT,
       userId INTEGER,
       userIpAddress TEXT,
-      documentId INTEGER,
+      documentId INTEGER NOT NULL,
       companyId INTEGER NOT NULL
     );
   `;

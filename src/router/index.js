@@ -7,16 +7,22 @@ const router = express.Router();
 router.use(middleware.logger);
 router.use(middleware.checkToken);
 
+// authentication
 router.post("/login", controllers.login);
-router.post("/check-token", controllers.checkToken);
-router.get("/offer-letter/:id", controllers.getOfferLetter);
+router.get("/check-token", controllers.checkToken);
+
+// company management
 router.post("/create-company", controllers.createCompany);
-router.post("/get-company-info", controllers.getCompanyInfo);
-router.post("/set-company-info", controllers.setCompanyInfo);
-router.post("/template-autocomplete", controllers.getTemplateAutocomplete);
-router.post("/get-pending-offers", controllers.getPendingOffers);
+router.get("/company-info", controllers.getCompanyInfo);
+router.post("/company-info", controllers.setCompanyInfo);
+router.get("/pending-offers", controllers.getPendingOffers);
+router.get("/feed", controllers.getRecentEvents);
+
+// offer letter generation and utilities
 router.post("/generate-offer-letter", controllers.generateOfferLetter);
-router.post("/confirm-offer-letter/:id", controllers.confirmOfferLetter);
+router.get("/template-autocomplete", controllers.getTemplateAutocomplete);
+router.get("/confirm-offer-letter/:id", controllers.confirmOfferLetter);
+router.get("/offer-letter/:id", controllers.getOfferLetter);
 router.post("/sign-offer-letter", controllers.signOfferLetter);
 
 module.exports = router;

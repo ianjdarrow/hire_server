@@ -143,32 +143,35 @@ const getCompanyInfo = async (req, res) => {
 
 const getTemplateAutocomplete = async (req, res) => {
   const user = req.user;
-  const term = req.body.term;
+  if (!user) return res.status(401).json({ error: "not authorized" });
+  const term = req.query.term;
   const db = await dbPromise;
   const suggestions = await db.all(
     `
     SELECT
+      previewURL,
       (firstName || ' ' || lastName) as name,
-      jobTitle
+      jobTitle,
+      created
     FROM offers
     WHERE company LIKE ?
     AND (firstName LIKE (? || '%') COLLATE NOCASE
     OR lastName LIKE  (? || '%') COLLATE NOCASE
-    OR jobTitle LIKE (? || '%') COLLATE NOCASE)
+    OR jobTitle LIKE ('%' || ? || '%') COLLATE NOCASE)
+    ORDER BY created DESC
   `,
     user.companyId,
     term,
     term,
     term
   );
-  console.log(suggestions);
-  res.json({ status: "ok" });
+  res.json({ suggestions });
 };
 
 const setCompanyInfo = async (req, res) => {
   const user = req.user;
   const db = await dbPromise;
-  const { name, logo, state, stateFull, stockPlanName } = req.body.company;
+  const { name, logo, state, stateFull, stockPlanName } = req.body;
   const result = await db.run(
     `
     UPDATE companies
@@ -199,6 +202,28 @@ const getOfferLetter = async (req, res) => {
     id
   );
   if (!letter) return res.status(404).json({ error: "no such document" });
+  await db.run(
+    `
+    INSERT INTO offerEvents(
+      priority,
+      eventType,
+      eventURL,
+      documentID,
+      eventData,
+      eventDataHash,
+      userIpAddress,
+      companyId
+    ) VALUES (?,?,?,?,?,?,?,?)
+    `,
+    3,
+    "offer_letter_viewed",
+    req.originalURL,
+    letter.id,
+    letter.html,
+    util.crypto.hash(letter.html),
+    "fake address",
+    letter.company
+  );
   const { previewURL, companyURL, employeeURL, ...cleanLetter } = letter;
   if (id === previewURL) cleanLetter.previewURL = previewURL;
   if (id === companyURL) cleanLetter.companyURL = companyURL;
@@ -236,7 +261,7 @@ const generateOfferLetter = async (req, res) => {
   // get company data from user auth info
   if (!req.user)
     return res.status(401).json({ error: "This route is authenticated" });
-  let { _, ...offer } = req.body;
+  let offer = req.body.offer;
   let user = req.user;
   const db = await dbPromise;
   const company = await db.get(
@@ -325,6 +350,30 @@ const generateOfferLetter = async (req, res) => {
     offer.status,
     offer.previewURL
   );
+  await db.run(
+    `
+    INSERT INTO offerEvents(
+      priority,
+      eventType,
+      eventURL,
+      eventData,
+      eventDataHash,
+      userId,
+      userIpAddress,
+      documentId,
+      companyId
+    ) VALUES (?,?,?,?,?,?,?,?,?)
+  `,
+    2,
+    "offer_letter_created",
+    req.originalURL,
+    offer.html,
+    util.crypto.hash(offer.html),
+    offer.owner,
+    "fake address",
+    offer.id,
+    offer.company
+  );
 
   // reply with offer letter object
   return res.json({
@@ -333,20 +382,21 @@ const generateOfferLetter = async (req, res) => {
 };
 
 const confirmOfferLetter = async (req, res) => {
-  const id = req.body.previewURL;
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: "Authentication required" });
+  const id = req.params.id;
   const db = await dbPromise;
   const letter = await db.get(
     `
-    SELECT o.status, o.supervisorName, o.supervisorEmail, o.companyURL
+    SELECT o.id, o.status, o.company, o.supervisorName, o.supervisorEmail, o.companyURL, o.html
       FROM offers o
       WHERE o.previewURL = ?
   `,
     id
   );
   if (letter.companyURL)
-    return res.json({
-      status: "ok",
-      message: "This letter has already been confirmed!"
+    return res.status(401).json({
+      error: "This letter has already been confirmed!"
     });
   const companyURL = uuid.uuid();
   await db.run(
@@ -357,15 +407,40 @@ const confirmOfferLetter = async (req, res) => {
     companyURL,
     id
   );
+  await db.run(
+    `
+    INSERT INTO offerEvents(
+      priority,
+      eventType,
+      eventURL,
+      eventData,
+      eventDataHash,
+      userId,
+      userIpAddress,
+      companyId,
+      documentId
+    ) VALUES (?,?,?,?,?,?,?,?,?)
+  `,
+    1,
+    "offer_letter_sent_to_company",
+    req.originalURL,
+    letter.html,
+    util.crypto.hash(letter.html),
+    user.id,
+    "fake address",
+    letter.company,
+    letter.id
+  );
+
   res.json({ status: "ok" });
 };
 
 const signOfferLetter = async (req, res) => {
   // add signature to master document object and advance status
-  const { id, html, signature, status } = req.body;
-  console.log(status);
+  const { id, companyId, html, signature, status } = req.body;
+  // TODO: validate fields
+  const db = await dbPromise;
   if (status === "awaiting_company_signature") {
-    const db = await dbPromise;
     // todo: check if signature already applied
     await db.run(
       `
@@ -378,10 +453,31 @@ const signOfferLetter = async (req, res) => {
       uuid.uuid(),
       id
     );
+    await db.run(
+      `
+      INSERT INTO offerEvents(
+        priority,
+        eventType,
+        eventURL,
+        eventData,
+        eventDataHash,
+        userIpAddress,
+        documentId,
+        companyId
+      ) VALUES (?,?,?,?,?,?,?,?)
+    `,
+      1,
+      "offer_letter_signed_company",
+      req.originalURL,
+      html,
+      util.crypto.hash(html),
+      "fake address",
+      id,
+      companyId
+    );
     return res.json({ status: "ok" });
   }
   if (status === "awaiting_employee_signature") {
-    const db = await dbPromise;
     // todo: check if signature already applied
     await db.run(
       `
@@ -393,9 +489,58 @@ const signOfferLetter = async (req, res) => {
       signature,
       id
     );
+    await db.run(
+      `
+      INSERT INTO offerEvents(
+        priority,
+        eventType,
+        eventURL,
+        eventData,
+        eventDataHash,
+        userIpAddress,
+        documentId,
+        companyId
+      ) VALUES (?,?,?,?,?,?,?,?)
+    `,
+      1,
+      "offer_letter_signed_employee",
+      req.originalURL,
+      html,
+      util.crypto.hash(html),
+      "fake address",
+      id,
+      companyId
+    );
     return res.json({ status: "ok" });
   }
   return res.status(400).json({ error: "Invalid signing!" });
+};
+const getRecentEvents = async (req, res) => {
+  const user = req.user;
+  const db = await dbPromise;
+  const results = await db.all(
+    `
+    SELECT
+      o.firstName,
+      o.lastName,
+      o.email,
+      o.status,
+      o.supervisorName,
+      o.supervisorEmail,
+      e.eventType,
+      e.eventTime,
+      e.id as eventId
+    FROM offers o
+    INNER JOIN offerEvents e
+    ON e.companyId = o.company
+    WHERE o.company = ?
+    AND e.priority < 2
+    ORDER BY e.eventTime DESC
+    LIMIT 10;
+  `,
+    user.companyId
+  );
+  return res.json(results);
 };
 
 module.exports = {
@@ -409,5 +554,6 @@ module.exports = {
   getOfferLetter,
   generateOfferLetter,
   confirmOfferLetter,
-  signOfferLetter
+  signOfferLetter,
+  getRecentEvents
 };
