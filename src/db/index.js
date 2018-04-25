@@ -82,6 +82,8 @@ const initDB = async () => {
       eventURL TEXT,
       userId INTEGER,
       userIpAddress TEXT,
+      companyId INTEGER,
+      documentId INTEGER,
       FOREIGN KEY (documentId) REFERENCES offers(id),
       FOREIGN KEY (companyId) REFERENCES companies(id)
     );
