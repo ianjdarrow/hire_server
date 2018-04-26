@@ -2,13 +2,14 @@ const format = require("date-fns/format");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const pug = require("pug");
+const stringSimilarity = require("string-similarity");
 const uuid = require("short-uuid");
 
 const dbPromise = require("../db").dbPromise;
 const util = require("../util");
 
-const offerLetterTemplate = pug.compileFile(
-  path.join(process.cwd(), "src/templates/OfferLetter.pug")
+const employeeCIIATemplate = pug.compileFile(
+  path.join(process.cwd(), "src/templates/EmployeeCIIA.pug")
 );
 
 const login = async (req, res) => {
@@ -16,6 +17,7 @@ const login = async (req, res) => {
   if (!(email && password))
     return res.status(400).json({ error: "Malformed request" });
   const db = await dbPromise;
+  console.log(db);
   const user = await db.get(
     `
     SELECT
@@ -44,7 +46,7 @@ const login = async (req, res) => {
   if (!(user && validPassword))
     return res.status(401).json({ error: "Invalid email or password" });
   const { passwordHash, ...userSanitized } = user;
-  const token = util.generateToken(userSanitized);
+  const token = util.signToken(userSanitized);
   userSanitized.token = token;
   return res.json({ user: userSanitized });
 };
@@ -148,25 +150,64 @@ const getTemplateAutocomplete = async (req, res) => {
   if (!user) return res.status(401).json({ error: "not authorized" });
   const term = req.query.term;
   const db = await dbPromise;
-  const suggestions = await db.all(
+  // const suggestions = await db.all(
+  //   `
+  //   SELECT
+  //     previewURL,
+  //     firstName,
+  //     lastName,
+  //     (firstName || ' ' || lastName) as name,
+  //     jobTitle,
+  //     created
+  //   FROM offers
+  //   WHERE company LIKE ?
+  //   AND (firstName LIKE (? || '%') COLLATE NOCASE
+  //   OR lastName LIKE  (? || '%') COLLATE NOCASE
+  //   OR jobTitle LIKE ('%' || ? || '%') COLLATE NOCASE)
+  //   ORDER BY created DESC
+  //   LIMIT 100
+  // `,
+  //   user.companyId,
+  //   term,
+  //   term,
+  //   term
+  // );
+  const result = await db.all(
     `
     SELECT
       previewURL,
+      firstName,
+      lastName,
       (firstName || ' ' || lastName) as name,
       jobTitle,
       created
     FROM offers
     WHERE company LIKE ?
-    AND (firstName LIKE (? || '%') COLLATE NOCASE
-    OR lastName LIKE  (? || '%') COLLATE NOCASE
-    OR jobTitle LIKE ('%' || ? || '%') COLLATE NOCASE)
-    ORDER BY created DESC
   `,
-    user.companyId,
-    term,
-    term,
-    term
+    user.companyId
   );
+  const suggestions = result
+    .filter(item => {
+      const score = Math.max(
+        stringSimilarity.compareTwoStrings(item.firstName, term),
+        stringSimilarity.compareTwoStrings(item.lastName, term),
+        stringSimilarity.compareTwoStrings(item.jobTitle, term)
+      );
+      return score > 0.5;
+    })
+    .sort((a, b) => {
+      const aScore = Math.max(
+        stringSimilarity.compareTwoStrings(a.firstName, term),
+        stringSimilarity.compareTwoStrings(a.lastName, term),
+        stringSimilarity.compareTwoStrings(a.jobTitle, term)
+      );
+      const bScore = Math.max(
+        stringSimilarity.compareTwoStrings(b.firstName, term),
+        stringSimilarity.compareTwoStrings(b.lastName, term),
+        stringSimilarity.compareTwoStrings(b.jobTitle, term)
+      );
+      return bScore - aScore;
+    });
   res.json({ suggestions });
 };
 
@@ -258,130 +299,6 @@ const getPendingOffers = async (req, res) => {
     user.companyId
   );
   res.json({ offers });
-};
-
-const generateOfferLetter = async (req, res) => {
-  // get company data from user auth info
-  if (!req.user)
-    return res.status(401).json({ error: "This route is authenticated" });
-  let offer = req.body.offer;
-  let user = req.user;
-  const db = await dbPromise;
-  const company = await db.get(
-    `
-    SELECT
-      c.id as company,
-      c.name as companyName,
-      c.state,
-      c.stateFull,
-      c.logo,
-      c.stockPlanName,
-      u.id as owner
-    FROM users u
-    INNER JOIN companies c
-    ON u.companyId = c.id
-    WHERE u.email = ?
-  `,
-    user.email.toLowerCase()
-  );
-
-  // build offer letter object
-  offer = {
-    ...company,
-    ...offer,
-    previewURL: uuid.uuid(),
-    status: "preview",
-    offerDateFormatted: format(offer.offerDate, "MMMM D, YYYY"),
-    respondByFormatted: format(offer.respondBy, "MMMM D, YYYY")
-  };
-  offer.html = offerLetterTemplate({ offer });
-
-  // add to DB
-  await db.run(
-    `
-    INSERT INTO offers(
-      status,
-      owner,
-      company,
-      companyName,
-      firstName,
-      lastName,
-      email,
-      jobTitle,
-      payUnit,
-      payRate,
-      equityType,
-      equityAmount,
-      vesting,
-      fulltime,
-      hasBenefits,
-      supervisorName,
-      supervisorTitle,
-      supervisorEmail,
-      offerDate,
-      offerDateFormatted,
-      respondBy,
-      respondByFormatted,
-      html,
-      status,
-      previewURL
-    )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    offer.status,
-    offer.owner,
-    offer.company,
-    offer.companyName,
-    offer.firstName,
-    offer.lastName,
-    offer.email,
-    offer.jobTitle,
-    offer.payUnit,
-    offer.payRate,
-    offer.equityType,
-    offer.equityAmount,
-    offer.vesting,
-    offer.fulltime,
-    offer.hasBenefits,
-    offer.supervisorName,
-    offer.supervisorTitle,
-    offer.supervisorEmail,
-    offer.offerDate,
-    offer.offerDateFormatted,
-    offer.respondBy,
-    offer.respondByFormatted,
-    offer.html,
-    offer.status,
-    offer.previewURL
-  );
-  await db.run(
-    `
-    INSERT INTO offerEvents(
-      priority,
-      eventType,
-      eventURL,
-      eventData,
-      eventDataHash,
-      userId,
-      userIpAddress,
-      documentId,
-      companyId
-    ) VALUES (?,?,?,?,?,?,?,?,?)
-  `,
-    2,
-    "offer_letter_created",
-    req.originalUrl,
-    offer.html,
-    util.crypto.hash(offer.html),
-    offer.owner,
-    "fake address",
-    offer.id,
-    offer.company
-  );
-
-  // reply with offer letter object
-  return res.json({
-    previewURL: offer.previewURL
-  });
 };
 
 const confirmOfferLetter = async (req, res) => {
@@ -523,7 +440,7 @@ const getRecentEvents = async (req, res) => {
   const db = await dbPromise;
   const results = await db.all(
     `
-    SELECT DISTINCT
+    SELECT
       o.firstName,
       o.lastName,
       o.email,
@@ -539,7 +456,7 @@ const getRecentEvents = async (req, res) => {
     WHERE e.companyId = ?
     AND e.priority < 2
     ORDER BY e.eventTime DESC
-    LIMIT 10;
+    LIMIT 6;
   `,
     user.companyId
   );
@@ -564,12 +481,16 @@ const deleteOfferLetter = async (req, res) => {
     offerId,
     user.companyId
   );
+  console.log(request);
   // todo: check if actually deleted
   res.json({ status: "ok" });
 };
 
+const auth = require("./auth");
+const employeeOfferLetter = require("./documents/employeeOfferLetter");
+
 module.exports = {
-  login,
+  login: auth.login,
   checkToken,
   createCompany,
   getCompanyInfo,
@@ -577,7 +498,7 @@ module.exports = {
   getPendingOffers,
   getTemplateAutocomplete,
   getOfferLetter,
-  generateOfferLetter,
+  generateOfferLetter: employeeOfferLetter.generateOfferLetter,
   confirmOfferLetter,
   signOfferLetter,
   deleteOfferLetter,

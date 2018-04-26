@@ -41,7 +41,7 @@ const checkToken = async (req, res, next) => {
       `,
         email
       );
-      const newToken = util.generateToken(claims);
+      const newToken = util.signToken(claims);
       req.user = { token: newToken, ...claims };
     }
   }

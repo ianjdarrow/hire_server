@@ -1,9 +1,11 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-const crypto = require("./crypto");
+const dbPromise = require("../db").dbPromise;
 
-const hashPassword = pass => {
+exports.crypto = require("./crypto");
+
+exports.hashPassword = pass => {
   return new Promise(res => {
     bcrypt.hash(pass, 9, (err, hash) => {
       return res(hash);
@@ -11,7 +13,7 @@ const hashPassword = pass => {
   });
 };
 
-const comparePassword = (candidate, hash) => {
+exports.comparePassword = (candidate, hash) => {
   return new Promise(res => {
     bcrypt.compare(candidate, hash, (err, result) => {
       res(result);
@@ -19,14 +21,41 @@ const comparePassword = (candidate, hash) => {
   });
 };
 
-const generateToken = token => {
+exports.getUser = email => {
+  return new Promise(async res => {
+    const db = await dbPromise;
+    const claims = await db.get(
+      `
+      SELECT
+        u.id,
+        u.email,
+        u.passwordHash,
+        u.title,
+        u.firstName,
+        u.lastName,
+        u.isAdministrator,
+        c.id AS companyId,
+        c.name AS companyName,
+        c.hasProvidedData
+      FROM users u
+      INNER JOIN companies c
+      ON u.companyId = c.id
+      WHERE u.email = ?;
+    `,
+      email
+    );
+    res(claims);
+  });
+};
+
+exports.signToken = token => {
   return jwt.sign(token, process.env.JWT_SECRET, {
     algorithm: "HS256",
     expiresIn: "30m"
   });
 };
 
-const checkToken = token => {
+exports.checkToken = token => {
   return new Promise(res => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET, {
@@ -37,12 +66,4 @@ const checkToken = token => {
       return res(false);
     }
   });
-};
-
-module.exports = {
-  crypto,
-  hashPassword,
-  comparePassword,
-  generateToken,
-  checkToken
 };
