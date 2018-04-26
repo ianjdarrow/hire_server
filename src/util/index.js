@@ -49,13 +49,15 @@ exports.getUser = email => {
 };
 
 exports.signToken = token => {
+  // just in case
+  delete token.passwordHash;
   return jwt.sign(token, process.env.JWT_SECRET, {
     algorithm: "HS256",
     expiresIn: "30m"
   });
 };
 
-exports.checkToken = token => {
+exports.validateToken = token => {
   return new Promise(res => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET, {

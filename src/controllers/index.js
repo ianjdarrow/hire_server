@@ -2,304 +2,19 @@ const format = require("date-fns/format");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const pug = require("pug");
-const stringSimilarity = require("string-similarity");
 const uuid = require("short-uuid");
 
 const dbPromise = require("../db").dbPromise;
 const util = require("../util");
 
+// import controllers
+const auth = require("./auth");
+const companies = require("./companies");
+const employeeOfferLetter = require("./documents/employeeOfferLetter");
+
 const employeeCIIATemplate = pug.compileFile(
   path.join(process.cwd(), "src/templates/EmployeeCIIA.pug")
 );
-
-const login = async (req, res) => {
-  const { email, password } = req.body;
-  if (!(email && password))
-    return res.status(400).json({ error: "Malformed request" });
-  const db = await dbPromise;
-  console.log(db);
-  const user = await db.get(
-    `
-    SELECT
-      u.email,
-      u.passwordHash,
-      u.title,
-      u.firstName,
-      u.lastName,
-      u.isAdministrator,
-      c.id AS companyId,
-      c.name AS companyName,
-      c.hasProvidedData
-      FROM users u
-      INNER JOIN companies c
-      ON u.companyId = c.id
-      WHERE u.email = ?;
-  `,
-    email
-  );
-  if (!user)
-    return res.status(401).json({ error: "Invalid email or password" });
-  const validPassword = await util.comparePassword(
-    password,
-    user.passwordHash || ""
-  );
-  if (!(user && validPassword))
-    return res.status(401).json({ error: "Invalid email or password" });
-  const { passwordHash, ...userSanitized } = user;
-  const token = util.signToken(userSanitized);
-  userSanitized.token = token;
-  return res.json({ user: userSanitized });
-};
-
-const checkToken = (req, res) => {
-  if (req.user) {
-    return res.json({ user: req.user });
-  }
-  return res.status(401).json({ error: "invalid token" });
-};
-
-const createCompany = async (req, res) => {
-  try {
-    const { email, password, companyName } = req.body;
-    if (!(email && password && companyName) || password.length < 8)
-      return res.status(400).json({ error: "Malformed request" });
-    const db = await dbPromise;
-    const user = await db.get("SELECT * FROM users WHERE email = ?", email);
-    if (user !== undefined)
-      return res.status(401).json({ error: "User is already registered" });
-    // TODO: verification for attempts to register known companies
-    // without company email address?
-    const pwHash = await util.hashPassword(password);
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedCompanyName = companyName.trim();
-    // create company
-    await db.run(
-      `INSERT INTO companies(
-        name,
-        accountLevel
-      ) VALUES (?, ?)`,
-      normalizedCompanyName,
-      "trial"
-    );
-    // get company ID - all users are associated with a company, so we need this first
-    let companyId = await db.get(
-      `SELECT id FROM COMPANIES WHERE name = ?`,
-      normalizedCompanyName
-    );
-    // create user and associate with company
-    await db.run(
-      `INSERT INTO users(
-        email,
-        passwordHash,
-        companyID,
-        isAdministrator,
-        isActive,
-        hasRegistered
-      ) VALUES(?,?,?,?,?,?)`,
-      normalizedEmail,
-      pwHash,
-      companyId.id,
-      1,
-      1,
-      1
-    );
-    // get user ID and set creator to company owner
-    let userId = await db.get(
-      `SELECT id FROM USERS WHERE email = ?`,
-      normalizedEmail
-    );
-    const setOwner = await db.run(
-      `UPDATE companies SET owner = ? WHERE id = ?`,
-      userId.id,
-      companyId.id
-    );
-    req.body.email = normalizedEmail;
-    req.body.password = password;
-    return login(req, res);
-    res.json({ company: companyName, owner: normalizedEmail });
-  } catch (err) {
-    console.log(err);
-    return res.status(500).json({ error: "Unable to create company" });
-  }
-};
-
-const getCompanyInfo = async (req, res) => {
-  const user = req.user;
-  // todo: handle user error
-  const db = await dbPromise;
-  const companyInfo = await db.get(
-    `
-    SELECT
-      c.name,
-      c.logo,
-      c.state,
-      c.stockPlanName,
-      c.hasProvidedData
-    FROM companies c
-    INNER JOIN users u
-    ON c.id = u.companyId
-    WHERE c.id = ?
-  `,
-    user.companyId
-  );
-  return res.json(companyInfo);
-};
-
-const getTemplateAutocomplete = async (req, res) => {
-  const user = req.user;
-  if (!user) return res.status(401).json({ error: "not authorized" });
-  const term = req.query.term;
-  const db = await dbPromise;
-  // const suggestions = await db.all(
-  //   `
-  //   SELECT
-  //     previewURL,
-  //     firstName,
-  //     lastName,
-  //     (firstName || ' ' || lastName) as name,
-  //     jobTitle,
-  //     created
-  //   FROM offers
-  //   WHERE company LIKE ?
-  //   AND (firstName LIKE (? || '%') COLLATE NOCASE
-  //   OR lastName LIKE  (? || '%') COLLATE NOCASE
-  //   OR jobTitle LIKE ('%' || ? || '%') COLLATE NOCASE)
-  //   ORDER BY created DESC
-  //   LIMIT 100
-  // `,
-  //   user.companyId,
-  //   term,
-  //   term,
-  //   term
-  // );
-  const result = await db.all(
-    `
-    SELECT
-      previewURL,
-      firstName,
-      lastName,
-      (firstName || ' ' || lastName) as name,
-      jobTitle,
-      created
-    FROM offers
-    WHERE company LIKE ?
-  `,
-    user.companyId
-  );
-  const suggestions = result
-    .filter(item => {
-      const score = Math.max(
-        stringSimilarity.compareTwoStrings(item.firstName, term),
-        stringSimilarity.compareTwoStrings(item.lastName, term),
-        stringSimilarity.compareTwoStrings(item.jobTitle, term)
-      );
-      return score > 0.5;
-    })
-    .sort((a, b) => {
-      const aScore = Math.max(
-        stringSimilarity.compareTwoStrings(a.firstName, term),
-        stringSimilarity.compareTwoStrings(a.lastName, term),
-        stringSimilarity.compareTwoStrings(a.jobTitle, term)
-      );
-      const bScore = Math.max(
-        stringSimilarity.compareTwoStrings(b.firstName, term),
-        stringSimilarity.compareTwoStrings(b.lastName, term),
-        stringSimilarity.compareTwoStrings(b.jobTitle, term)
-      );
-      return bScore - aScore;
-    });
-  res.json({ suggestions });
-};
-
-const setCompanyInfo = async (req, res) => {
-  const user = req.user;
-  const db = await dbPromise;
-  const { name, logo, state, stateFull, stockPlanName } = req.body;
-  const result = await db.run(
-    `
-    UPDATE companies
-      SET name=?, logo=?, state=?, stateFull=?, stockPlanName=?, hasProvidedData = ?
-      WHERE id = (SELECT companyId FROM users WHERE email=?)
-  `,
-    name,
-    logo,
-    state,
-    stateFull,
-    stockPlanName,
-    1,
-    user.email
-  );
-  res.json({ status: "ok" });
-};
-
-const getOfferLetter = async (req, res) => {
-  const id = req.params.id;
-  const db = await dbPromise;
-  const letter = await db.get(
-    `
-    SELECT * FROM offers
-    WHERE previewURL = ? OR companyURL = ? OR employeeURL = ?
-  `,
-    id,
-    id,
-    id
-  );
-  if (!letter) return res.status(404).json({ error: "no such document" });
-  await db.run(
-    `
-    INSERT INTO offerEvents(
-      priority,
-      eventType,
-      eventURL,
-      documentID,
-      eventData,
-      eventDataHash,
-      userIpAddress,
-      companyId
-    ) VALUES (?,?,?,?,?,?,?,?)
-    `,
-    3,
-    "offer_letter_viewed",
-    req.originalUrl,
-    letter.id,
-    letter.html,
-    util.crypto.hash(letter.html),
-    "fake address",
-    letter.company
-  );
-  const { previewURL, companyURL, employeeURL, ...cleanLetter } = letter;
-  if (id === previewURL) cleanLetter.previewURL = previewURL;
-  if (id === companyURL) cleanLetter.companyURL = companyURL;
-  if (id === employeeURL) cleanLetter.employeeURL = employeeURL;
-  return res.json(cleanLetter);
-};
-
-const getPendingOffers = async (req, res) => {
-  const user = req.user;
-  const db = await dbPromise;
-  const offers = await db.all(
-    `
-    SELECT
-      id,
-      (firstName || ' ' || lastName) AS name,
-      email,
-      jobTitle,
-      payRate,
-      equityType,
-      equityAmount,
-      status,
-      created,
-      previewURL,
-      offerDateFormatted,
-      respondByFormatted,
-      owner
-    FROM offers
-    WHERE company = ? AND status != 'done'
-  `,
-    user.companyId
-  );
-  res.json({ offers });
-};
 
 const confirmOfferLetter = async (req, res) => {
   const user = req.user;
@@ -435,33 +150,6 @@ const signOfferLetter = async (req, res) => {
   }
   return res.status(400).json({ error: "Invalid signing!" });
 };
-const getRecentEvents = async (req, res) => {
-  const user = req.user;
-  const db = await dbPromise;
-  const results = await db.all(
-    `
-    SELECT
-      o.firstName,
-      o.lastName,
-      o.email,
-      o.status,
-      o.supervisorName,
-      o.supervisorEmail,
-      e.eventType,
-      e.eventTime,
-      e.id as eventId
-    FROM offerEvents e
-    INNER JOIN offers o
-    ON o.id = e.documentId
-    WHERE e.companyId = ?
-    AND e.priority < 2
-    ORDER BY e.eventTime DESC
-    LIMIT 6;
-  `,
-    user.companyId
-  );
-  return res.json(results);
-};
 
 const deleteOfferLetter = async (req, res) => {
   const user = req.user;
@@ -486,21 +174,23 @@ const deleteOfferLetter = async (req, res) => {
   res.json({ status: "ok" });
 };
 
-const auth = require("./auth");
-const employeeOfferLetter = require("./documents/employeeOfferLetter");
-
 module.exports = {
+  // authentication
   login: auth.login,
-  checkToken,
-  createCompany,
-  getCompanyInfo,
-  setCompanyInfo,
-  getPendingOffers,
-  getTemplateAutocomplete,
-  getOfferLetter,
+  checkToken: auth.checkToken,
+
+  // company management
+  createCompany: companies.createCompany,
+  getCompanyInfo: companies.getCompanyInfo,
+  setCompanyInfo: companies.setCompanyInfo,
+  getPendingOffers: companies.getPendingOffers,
+  getCompanyFeed: companies.getCompanyFeed,
+  offerTemplateSearch: companies.offerTemplateSearch,
+
+  // offer letter management
   generateOfferLetter: employeeOfferLetter.generateOfferLetter,
+  getOfferLetter: employeeOfferLetter.getOfferLetter,
   confirmOfferLetter,
   signOfferLetter,
-  deleteOfferLetter,
-  getRecentEvents
+  deleteOfferLetter
 };

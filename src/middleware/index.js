@@ -1,7 +1,7 @@
 const util = require("../util");
 const dbPromise = require("../db").dbPromise;
 
-const logger = (req, res, next) => {
+exports.logger = (req, res, next) => {
   req.startTime = new Date();
   res.on("finish", () => {
     console.log(
@@ -13,11 +13,13 @@ const logger = (req, res, next) => {
   next();
 };
 
-const checkToken = async (req, res, next) => {
-  const authHeader = req.headers.authentication.split(" ");
+exports.validateToken = async (req, res, next) => {
+  const hdr = req.headers.authentication;
+  if (!hdr) return next();
+  const authHeader = hdr.split(" ");
   const token = authHeader.length === 2 ? authHeader[1] : null;
   if (token) {
-    const validToken = await util.checkToken(token);
+    const validToken = await util.validateToken(token);
     if (validToken) {
       const email = validToken.email;
       const db = await dbPromise;
@@ -49,7 +51,9 @@ const checkToken = async (req, res, next) => {
   next();
 };
 
-module.exports = {
-  logger,
-  checkToken
+exports.requireUser = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({});
+  }
+  next();
 };

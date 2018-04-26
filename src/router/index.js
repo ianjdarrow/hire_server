@@ -1,29 +1,45 @@
 const express = require("express");
 const controllers = require("../controllers");
-const middleware = require("../middleware");
+const mw = require("../middleware");
 
 const router = express.Router();
 
-router.use(middleware.logger);
-router.use(middleware.checkToken);
+router.use(mw.logger);
+router.use(mw.validateToken);
 
 // authentication
 router.post("/login", controllers.login);
-router.get("/check-token", controllers.checkToken);
+router.get("/check-token", mw.requireUser, controllers.checkToken);
 
 // company management
 router.post("/create-company", controllers.createCompany);
-router.get("/company-info", controllers.getCompanyInfo);
-router.post("/company-info", controllers.setCompanyInfo);
-router.get("/pending-offers", controllers.getPendingOffers);
-router.get("/feed", controllers.getRecentEvents);
+router
+  .route("/company-info")
+  .get(mw.requireUser, controllers.getCompanyInfo)
+  .post(mw.requireUser, controllers.setCompanyInfo);
+router.get("/pending-offers", mw.requireUser, controllers.getPendingOffers);
+router.get("/feed", mw.requireUser, controllers.getCompanyFeed);
 
 // offer letter generation and utilities
-router.post("/generate-offer-letter", controllers.generateOfferLetter);
-router.get("/template-autocomplete", controllers.getTemplateAutocomplete);
-router.get("/confirm-offer-letter/:id", controllers.confirmOfferLetter);
-router.get("/offer-letter/:id", controllers.getOfferLetter);
+router.post(
+  "/generate-offer-letter",
+  mw.requireUser,
+  controllers.generateOfferLetter
+);
+router.get(
+  "/offer-template-search",
+  mw.requireUser,
+  controllers.offerTemplateSearch
+);
+router.get(
+  "/confirm-offer-letter/:id",
+  mw.requireUser,
+  controllers.confirmOfferLetter
+);
+router
+  .route("/offer-letter/:id")
+  .get(controllers.getOfferLetter)
+  .delete(mw.requireUser, controllers.deleteOfferLetter);
 router.post("/sign-offer-letter", controllers.signOfferLetter);
-router.delete("/offer-letter/:id", controllers.deleteOfferLetter);
 
 module.exports = router;

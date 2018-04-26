@@ -13,7 +13,7 @@ const loginSchema = joi.object().keys({
 });
 
 exports.login = async (req, res) => {
-  const validate = joi.validate(req.body, loginSchema);
+  const validate = joi.validate(req.body, loginSchema, { allowUnknown: true });
   if (validate.error)
     return res
       .status(400)
@@ -32,4 +32,8 @@ exports.login = async (req, res) => {
   const token = util.signToken(userSanitized);
   userSanitized.token = token;
   return res.json({ user: userSanitized });
+};
+
+exports.checkToken = (req, res) => {
+  return res.json({ user: req.user });
 };

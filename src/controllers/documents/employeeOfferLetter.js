@@ -11,6 +11,7 @@ const offerLetterTemplate = pug.compileFile(
   path.join(process.cwd(), "src/templates/OfferLetter.pug")
 );
 
+// todo: finish this schema and implement
 const generateOfferLetterSchema = joi.object().keys({
   firstName: joi
     .string()
@@ -159,4 +160,90 @@ exports.generateOfferLetter = async (req, res) => {
   return res.json({
     previewURL: offer.previewURL
   });
+};
+
+const offerEventsSchema = joi.object().keys({
+  priority: joi
+    .number()
+    .integer()
+    .required(),
+  eventType: joi.string().required(),
+  eventURL: joi
+    .string()
+    .uri({ allowRelative: true })
+    .required(),
+  eventData: joi.string().required(),
+  eventDataHash: joi.string().required(),
+  documentId: joi
+    .number()
+    .integer()
+    .required(),
+  // todo: actual IP address validation
+  userIpAddress: joi.string().required(),
+  companyId: joi
+    .number()
+    .integer()
+    .required()
+});
+
+exports.getOfferLetter = async (req, res) => {
+  const id = req.params.id;
+  const db = await dbPromise;
+  const letter = await db.get(
+    `
+    SELECT * FROM offers
+    WHERE previewURL = ? OR companyURL = ? OR employeeURL = ?
+  `,
+    id,
+    id,
+    id
+  );
+  if (!letter) return res.status(404).json({});
+  const event = {
+    priority: 3,
+    eventType: "offer_letter_viewed",
+    eventURL: req.originalUrl,
+    documentId: letter.id,
+    eventData: letter.html,
+    eventDataHash: util.crypto.hash(letter.html),
+    // todo: IP logging
+    userIpAddress: "fake address",
+    companyId: letter.company
+  };
+  const validate = joi.validate(event, offerEventsSchema, {
+    allowUnknown: true
+  });
+  if (validate.error)
+    return res
+      .status(500)
+      .json({ error: "Issue logging access, Support team has been notified." });
+  await db.run(
+    `
+    INSERT INTO offerEvents(
+      priority,
+      eventType,
+      eventURL,
+      documentID,
+      eventData,
+      eventDataHash,
+      userIpAddress,
+      companyId
+    ) VALUES (?,?,?,?,?,?,?,?)
+    `,
+    event.priority,
+    event.eventType,
+    event.eventURL,
+    event.documentID,
+    event.eventData,
+    event.eventDataHash,
+    event.userIpAddress,
+    event.companyId
+  );
+  // never let signer IDs hit the wire unless intended – allows for bad signing!
+  const { previewURL, companyURL, employeeURL, ...cleanLetter } = letter;
+  if (id === previewURL) cleanLetter.previewURL = previewURL;
+  if (id === companyURL) cleanLetter.companyURL = companyURL;
+  if (id === employeeURL) cleanLetter.employeeURL = employeeURL;
+
+  return res.json(cleanLetter);
 };
