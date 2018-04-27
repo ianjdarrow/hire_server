@@ -113,7 +113,7 @@ const companyInfoSchema = joi.object().keys({
     .string()
     .regex(/^data:image\/(svg\+xml|gif|jpeg|jpg|svg|png)/)
     .max(256 * 1024, "utf8")
-    .required(),
+    .allow(""),
   state: joi
     .string()
     .min(2)
@@ -124,7 +124,7 @@ const companyInfoSchema = joi.object().keys({
 });
 
 exports.setCompanyInfo = async (req, res) => {
-  const validate = joi.validate(companyInfoSchema, req.body);
+  const validate = joi.validate(req.body, companyInfoSchema);
   if (validate.error) return res.status(400).json({});
   const user = req.user;
   const db = await dbPromise;
@@ -143,8 +143,9 @@ exports.setCompanyInfo = async (req, res) => {
     1,
     user.companyId
   );
-  if (!update.lastID)
+  if (!update.changes) {
     return res.status(500).json({ error: "Failed to update company" });
+  }
   return res.json({});
 };
 
@@ -188,14 +189,14 @@ exports.getCompanyFeed = async (req, res) => {
       o.supervisorName,
       o.supervisorEmail,
       e.eventType,
-      e.eventTime,
+      e.created,
       e.id as eventId
     FROM offerEvents e
     INNER JOIN offers o
     ON o.id = e.documentId
     WHERE e.companyId = ?
     AND e.priority < 2
-    ORDER BY e.eventTime DESC
+    ORDER BY e.created DESC
     LIMIT 6;
   `,
     user.companyId

@@ -74,12 +74,12 @@ const initDB = async () => {
   const createOfferEventsTable = `
     CREATE TABLE IF NOT EXISTS offerEvents(
       id INTEGER PRIMARY KEY,
-      priority INTEGER,
-      eventType TEXT,
-      eventTime DATETIME DEFAULT (datetime('now')),
-      eventData TEXT,
-      eventDataHash TEXT,
-      eventURL TEXT,
+      created DATETIME DEFAULT (datetime('now')),
+      priority INTEGER REQUIRED,
+      eventType TEXT REQUIRED,
+      signatureData TEXT,
+      eventDataHash TEXT REQUIRED,
+      eventURL TEXT REQUIRED,
       userId INTEGER,
       userIpAddress TEXT,
       companyId INTEGER,

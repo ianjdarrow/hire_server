@@ -13,25 +13,58 @@ const offerLetterTemplate = pug.compileFile(
 
 // todo: finish this schema and implement
 const generateOfferLetterSchema = joi.object().keys({
-  firstName: joi
-    .string()
-    .alphanum()
-    .min(2)
+  company: joi
+    .number()
+    .integer()
     .required(),
-  lastName: joi
+  companyName: joi.string().required(),
+  state: joi
     .string()
-    .alphanum()
     .min(2)
+    .max(2)
     .required(),
+  stateFull: joi.string().required(),
+  logo: joi.string().optional(),
+  stockPlanName: joi.string().required(),
+  owner: joi
+    .number()
+    .integer()
+    .required(),
+  firstName: joi.string().required(),
+  lastName: joi.string().required(),
   email: joi
     .string()
     .email()
     .required(),
   jobTitle: joi
     .string()
-    .alphanum()
     .min(2)
-    .required()
+    .required(),
+  payUnit: joi.string().required(),
+  payRate: joi.number().required(),
+  equityType: joi.string().required(),
+  equityAmount: joi
+    .number()
+    .integer()
+    .allow(null),
+  vesting: joi.string().optional(),
+  fulltime: joi.string().required(),
+  hasBenefits: joi.string().required(),
+  supervisorName: joi.string().required(),
+  supervisorTitle: joi.string().required(),
+  supervisorEmail: joi
+    .string()
+    .email()
+    .required(),
+  offerDate: joi.string().required(),
+  offerDateFormatted: joi.string().required(),
+  respondBy: joi.string().required(),
+  respondByFormatted: joi.string().required(),
+  previewURL: joi
+    .string()
+    .uuid()
+    .required(),
+  status: joi.string().required()
 });
 
 //
@@ -42,7 +75,6 @@ exports.generateOfferLetter = async (req, res) => {
   if (!req.user)
     return res.status(401).json({ error: "This route is authenticated" });
   let offer = req.body.offer;
-  console.log(req.body);
   let user = req.user;
   const db = await dbPromise;
   const company = await db.get(
@@ -62,16 +94,22 @@ exports.generateOfferLetter = async (req, res) => {
   `,
     user.email.toLowerCase()
   );
+  console.log(company);
 
   // build offer letter object
   offer = {
     ...company,
     ...offer,
+    htmlHash: util.crypto.hash(offer.html),
     previewURL: uuid.uuid(),
     status: "preview",
     offerDateFormatted: format(offer.offerDate, "MMMM D, YYYY"),
     respondByFormatted: format(offer.respondBy, "MMMM D, YYYY")
   };
+  validate = joi.validate(offer, generateOfferLetterSchema);
+  if (validate.error) {
+    return res.status(400).json({});
+  }
   offer.html = offerLetterTemplate({ offer });
 
   // add to DB
@@ -101,10 +139,11 @@ exports.generateOfferLetter = async (req, res) => {
       respondBy,
       respondByFormatted,
       html,
+      htmlHash,
       status,
       previewURL
     )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     offer.status,
     offer.owner,
     offer.company,
@@ -128,6 +167,7 @@ exports.generateOfferLetter = async (req, res) => {
     offer.respondBy,
     offer.respondByFormatted,
     offer.html,
+    offer.htmlHash,
     offer.status,
     offer.previewURL
   );
@@ -137,7 +177,7 @@ exports.generateOfferLetter = async (req, res) => {
       priority,
       eventType,
       eventURL,
-      eventData,
+      signatureData,
       eventDataHash,
       userId,
       userIpAddress,
@@ -172,7 +212,7 @@ const offerEventsSchema = joi.object().keys({
     .string()
     .uri({ allowRelative: true })
     .required(),
-  eventData: joi.string().required(),
+  signatureData: joi.string(),
   eventDataHash: joi.string().required(),
   documentId: joi
     .number()
@@ -204,7 +244,6 @@ exports.getOfferLetter = async (req, res) => {
     eventType: "offer_letter_viewed",
     eventURL: req.originalUrl,
     documentId: letter.id,
-    eventData: letter.html,
     eventDataHash: util.crypto.hash(letter.html),
     // todo: IP logging
     userIpAddress: "fake address",
@@ -224,17 +263,15 @@ exports.getOfferLetter = async (req, res) => {
       eventType,
       eventURL,
       documentID,
-      eventData,
       eventDataHash,
       userIpAddress,
       companyId
-    ) VALUES (?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?)
     `,
     event.priority,
     event.eventType,
     event.eventURL,
     event.documentID,
-    event.eventData,
     event.eventDataHash,
     event.userIpAddress,
     event.companyId
@@ -246,4 +283,232 @@ exports.getOfferLetter = async (req, res) => {
   if (id === employeeURL) cleanLetter.employeeURL = employeeURL;
 
   return res.json(cleanLetter);
+};
+
+exports.deleteOfferLetter = async (req, res) => {
+  const user = req.user;
+  const offerId = req.params.id;
+  if (!offerId)
+    return res.status(400).json({ error: "Invalid offer letter ID" });
+  const db = await dbPromise;
+  const request = await db.run(
+    `
+    DELETE FROM offers
+    WHERE id = ?
+    AND company = ?
+    AND status IN ('preview', 'awaiting_company_signature')
+  `,
+    offerId,
+    user.companyId
+  );
+  if (request.changes === 0) {
+    return res.status(401).json({ error: "Unable to delete record" });
+  }
+  res.json({});
+};
+
+exports.confirmOfferLetter = async (req, res) => {
+  const user = req.user;
+  const id = req.params.id;
+  const db = await dbPromise;
+
+  const letter = await db.get(
+    `
+    SELECT o.id, o.status, o.company, o.supervisorName, o.supervisorEmail, o.companyURL, o.html
+      FROM offers o
+      WHERE o.previewURL = ?
+  `,
+    id
+  );
+  if (!letter) return res.status(404).json({});
+  if (letter.companyURL)
+    return res.status(401).json({
+      error: "This letter has already been confirmed"
+    });
+  const companyURL = uuid.uuid();
+  const confirmLetter = await db.run(
+    `
+    UPDATE offers
+      SET status = 'awaiting_company_signature', companyURL = ?
+      WHERE previewURL = ?
+      AND status = 'preview'`,
+    companyURL,
+    id
+  );
+  if (!confirmLetter.changes) {
+    return res.status(400).json({ error: "Invalid status change" });
+  }
+  const log = await db.run(
+    `
+    INSERT INTO offerEvents(
+      priority,
+      eventType,
+      eventURL,
+      eventDataHash,
+      userId,
+      userIpAddress,
+      companyId,
+      documentId
+    ) VALUES (?,?,?,?,?,?,?,?)
+  `,
+    1,
+    "offer_letter_sent_to_company",
+    req.originalUrl,
+    util.crypto.hash(letter.html),
+    user.id,
+    "fake address",
+    letter.company,
+    letter.id
+  );
+  if (!log.changes) {
+    console.log("LOGGING ERROR!");
+  }
+  res.json({ status: "ok" });
+};
+const signOfferLetterSchema = joi.object().keys({
+  documentId: joi
+    .string()
+    .uuid()
+    .required(),
+  html: joi.string().required(),
+  signature: joi
+    .string()
+    .required()
+    .regex(/^data:image\/(svg\+xml|svg)/)
+});
+exports.signOfferLetter = async (req, res) => {
+  // add signature to master document object and advance status
+  const validate = joi.validate(req.body, signOfferLetterSchema);
+  if (validate.error) return res.status(400).json({});
+  const { documentId, html, signature } = req.body;
+
+  const db = await dbPromise;
+  const offerLetter = await db.get(
+    `
+    SELECT
+      id,
+      company,
+      status,
+      companyURL,
+      companySignature,
+      employeeURL,
+      employeeSignature,
+      htmlHash
+    FROM offers
+    WHERE (
+      companyURL = ? OR employeeURL = ?
+    )
+  `,
+    documentId,
+    documentId
+  );
+  if (!offerLetter) return res.status(404).json({});
+  const event = {
+    priority: 1,
+    eventURL: req.originalUrl,
+    signatureData: signature,
+    eventDataHash: util.crypto.hash(html),
+    userIpAddress: "fake address",
+    documentId: offerLetter.id,
+    companyId: offerLetter.company
+  };
+  if (
+    offerLetter.status === "awaiting_company_signature" &&
+    documentId === offerLetter.companyURL &&
+    offerLetter.companySignature === null
+  ) {
+    event.eventType = "offer_letter_signed_company";
+    const validated = joi.validate(event, offerEventsSchema);
+    if (validated.error) {
+      return res.status(400).json({});
+    }
+    const writeSignatureEvent = await db.run(
+      `
+      UPDATE offers
+        SET status = ?, companySignature = ?, employeeURL = ?
+        WHERE id = ?
+    `,
+      "awaiting_employee_signature",
+      signature,
+      uuid.uuid(),
+      offerLetter.id
+    );
+    if (!writeSignatureEvent.changes) {
+      return res.status(400).json({});
+    }
+
+    console.log(validated);
+    const signatureEventUpdate = await db.run(
+      `
+      INSERT INTO offerEvents(
+        priority,
+        eventType,
+        eventURL,
+        signatureData,
+        eventDataHash,
+        userIpAddress,
+        documentId,
+        companyId
+      ) VALUES (?,?,?,?,?,?,?,?)
+    `,
+      event.priority,
+      event.eventType,
+      event.eventURL,
+      event.signatureData,
+      event.eventDataHash,
+      event.userIpAddress,
+      event.documentId,
+      event.companyId
+    );
+    if (!signatureEventUpdate.changes) {
+      // todo: alert to admin
+      console.log("Error writing event!");
+    }
+    return res.json({ status: "ok" });
+  }
+  if (
+    offerLetter.status === "awaiting_employee_signature" &&
+    documentId === offerLetter.employeeURL &&
+    offerLetter.employeeSignature === null
+  ) {
+    event.eventType = "offer_letter_signed_employee";
+    const validated = joi.validate(event, offerEventsSchema);
+    if (validated.error) {
+      return res.status(400).json({});
+    }
+    await db.run(
+      `
+      UPDATE offers
+        SET status = ?, employeeSignature = ?
+        WHERE id = ?
+    `,
+      "done",
+      signature,
+      offerLetter.id
+    );
+    await db.run(
+      `
+      INSERT INTO offerEvents(
+        priority,
+        eventType,
+        eventURL,
+        signatureData,
+        eventDataHash,
+        userIpAddress,
+        documentId,
+        companyId
+      ) VALUES (?,?,?,?,?,?,?,?)
+    `,
+      event.priority,
+      event.eventType,
+      event.eventURL,
+      event.signatureData,
+      event.eventDataHash,
+      event.userIpAddress,
+      event.documentId,
+      event.companyId
+    );
+    return res.json({});
+  }
+  return res.status(400).json({ error: "Invalid signing!" });
 };

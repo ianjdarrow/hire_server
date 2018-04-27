@@ -1,11 +1,14 @@
-const util = require("../util");
 const dbPromise = require("../db").dbPromise;
+const format = require("date-fns/format");
+const util = require("../util");
 
 exports.logger = (req, res, next) => {
   req.startTime = new Date();
   res.on("finish", () => {
+    const now = format(new Date(), "M-D HH:mm:ss");
+    const elapsed = new Date() - req.startTime;
     console.log(
-      `SERVE ${req.originalUrl} | ${new Date() - req.startTime}ms | ${
+      `${now}\t${req.method} ${req.originalUrl} | ${elapsed}ms | ${
         res.statusCode
       }`
     );

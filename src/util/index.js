@@ -50,7 +50,9 @@ exports.getUser = email => {
 
 exports.signToken = token => {
   // just in case
-  delete token.passwordHash;
+  try {
+    delete token.passwordHash;
+  } catch (err) {}
   return jwt.sign(token, process.env.JWT_SECRET, {
     algorithm: "HS256",
     expiresIn: "30m"
