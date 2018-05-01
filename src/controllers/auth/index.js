@@ -49,7 +49,7 @@ exports.signup = async (req, res) => {
       .json({ error: "You must provide an email and password" });
   }
   const { email, password } = validate.value;
-  const passwordHash = await util.hashPassword(password);
+  const hashed = await util.hashPassword(password);
   const registrationLink = uuid.uuid();
 
   const db = await dbPromise;
@@ -63,14 +63,14 @@ exports.signup = async (req, res) => {
       ) VALUES (?,?,?)
     `,
       email,
-      passwordHash,
+      hashed,
       registrationLink
     );
     if (!addUser.lastID) {
       console.log(addUser);
       return res.status(401).json({ error: "Unable to create account" });
     }
-    const registrationLinkURL = genRegistrationLink(user.registrationLink);
+    const registrationLinkURL = genRegistrationLink(registrationLink);
     mail.sendAccountConfirmationEmail({
       email,
       registrationLink: registrationLinkURL
