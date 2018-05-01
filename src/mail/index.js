@@ -34,7 +34,7 @@ exports.sendAccountConfirmationEmail = async params => {
         subject: "QuickSend Registration",
         html
       },
-      recipients: [{ address: "ian.j.darrow@gmail.com" }]
+      recipients: [{ address: process.env.TEST_EMAIL || params.email }]
     });
     return true;
   } catch (err) {
