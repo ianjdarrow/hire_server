@@ -9,6 +9,9 @@ router.use(mw.validateToken);
 
 // authentication
 router.post("/login", controllers.login);
+router.post("/signup", controllers.signup);
+router.get("/send-registration-link", controllers.sendRegistrationLink);
+router.get("/confirm-registration/:id", controllers.confirmRegistration);
 router.get("/check-token", mw.requireUser, controllers.checkToken);
 
 // company management

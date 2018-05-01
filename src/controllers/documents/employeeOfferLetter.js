@@ -5,6 +5,8 @@ const pug = require("pug");
 const uuid = require("short-uuid");
 
 const dbPromise = require(path.join(process.cwd(), "src/db")).dbPromise;
+
+const mail = require("../../mail");
 const util = require(path.join(process.cwd(), "src/util"));
 
 const offerLetterTemplate = pug.compileFile(
@@ -94,13 +96,10 @@ exports.generateOfferLetter = async (req, res) => {
   `,
     user.email.toLowerCase()
   );
-  console.log(company);
-
   // build offer letter object
   offer = {
     ...company,
     ...offer,
-    htmlHash: util.crypto.hash(offer.html),
     previewURL: uuid.uuid(),
     status: "preview",
     offerDateFormatted: format(offer.offerDate, "MMMM D, YYYY"),
@@ -111,6 +110,7 @@ exports.generateOfferLetter = async (req, res) => {
     return res.status(400).json({});
   }
   offer.html = offerLetterTemplate({ offer });
+  offer.htmlHash = util.crypto.hash(offer.html);
 
   // add to DB
   await db.run(
@@ -246,7 +246,7 @@ exports.getOfferLetter = async (req, res) => {
     documentId: letter.id,
     eventDataHash: util.crypto.hash(letter.html),
     // todo: IP logging
-    userIpAddress: "fake address",
+    userIpAddress: util.getIpAddress(req),
     companyId: letter.company
   };
   const validate = joi.validate(event, offerEventsSchema, {
@@ -437,7 +437,6 @@ exports.signOfferLetter = async (req, res) => {
       return res.status(400).json({});
     }
 
-    console.log(validated);
     const signatureEventUpdate = await db.run(
       `
       INSERT INTO offerEvents(
@@ -476,7 +475,7 @@ exports.signOfferLetter = async (req, res) => {
     if (validated.error) {
       return res.status(400).json({});
     }
-    await db.run(
+    const writeSignatureEvent = await db.run(
       `
       UPDATE offers
         SET status = ?, employeeSignature = ?
@@ -486,7 +485,10 @@ exports.signOfferLetter = async (req, res) => {
       signature,
       offerLetter.id
     );
-    await db.run(
+    if (!writeSignatureEvent.changes) {
+      return res.status(400).json({});
+    }
+    const signatureEventUpdate = await db.run(
       `
       INSERT INTO offerEvents(
         priority,
@@ -508,6 +510,10 @@ exports.signOfferLetter = async (req, res) => {
       event.documentId,
       event.companyId
     );
+    if (!signatureEventUpdate.changes) {
+      // todo: alert to admin
+      console.log("Error writing event!");
+    }
     return res.json({});
   }
   return res.status(400).json({ error: "Invalid signing!" });

@@ -1,11 +1,13 @@
 const joi = require("joi");
 const path = require("path");
 const stringSimilarity = require("string-similarity");
+const uuid = require("short-uuid");
 
 const dbPromise = require(path.join(process.cwd(), "src/db")).dbPromise;
 const util = require(path.join(process.cwd(), "src/util"));
 
 const auth = require("../auth");
+const mail = require("../../mail");
 
 //
 // Create a new company and its owner/user, all at once.
@@ -36,6 +38,7 @@ exports.createCompany = async (req, res) => {
   // without company email address?
   const pwHash = await util.hashPassword(password);
   const normalizedEmail = email.trim().toLowerCase();
+  const registrationLink = uuid.uuid();
 
   const createUser = await db.run(
     `INSERT INTO users(
@@ -43,13 +46,15 @@ exports.createCompany = async (req, res) => {
         passwordHash,
         isAdministrator,
         isActive,
-        hasRegistered
-      ) VALUES(?,?,?,?,?)`,
+        hasRegistered,
+        registrationLink
+      ) VALUES(?,?,?,?,?,?)`,
     normalizedEmail,
     pwHash,
     1,
     1,
-    1
+    0,
+    registrationLink
   );
   if (!createUser.lastID) {
     return res.status(401).json({ error: "Error creating user" });
@@ -79,6 +84,7 @@ exports.createCompany = async (req, res) => {
   if (!setOwner.lastID) {
     return res.status(500).json({ error: "Error registering company" });
   }
+  mail.sendAccountConfirmationEmail({ email, registrationLink });
   return auth.login(req, res);
 };
 

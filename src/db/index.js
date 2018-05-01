@@ -24,16 +24,18 @@ const initDB = async () => {
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users(
       id INTEGER PRIMARY KEY,
+      companyId INTEGER,
       email TEXT UNIQUE,
       firstName TEXT,
       lastName TEXT,
       title TEXT,
       passwordHash TEXT,
       resetToken TEXT,
-      hasRegistered INTEGER,
+      hasRegistered INTEGER DEFAULT 0,
+      registrationLink TEXT,
       isActive INTEGER,
       isAdministrator INTEGER,
-      companyId INTEGER,
+      resetLink TEXT,
       FOREIGN KEY (companyId) REFERENCES companies(id)
     );`;
   const createOffersTable = `

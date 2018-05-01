@@ -1,0 +1,17 @@
+.html {
+  font-family: -apple-system, BlinkMacSystemFont, “Roboto”, “Droid Sans”,
+    “Helvetica Neue”, Helvetica, Arial, sans-serif;
+  line-height: 1.5rem;
+  -webkit-font-smoothing: antialiased;
+  color: #222;
+  margin: 0;
+  padding: 1rem;
+}
+.content {
+  background: rgba(48, 62, 83, 1);
+  padding: 2rem;
+  border-radius: 1rem;
+  color: white;
+  width: 100%;
+  max-width: 600px;
+}

@@ -6,6 +6,9 @@ const employeeOfferLetter = require("./documents/employeeOfferLetter");
 module.exports = {
   // authentication
   login: auth.login,
+  signup: auth.signup,
+  sendRegistrationLink: auth.sendRegistrationLink,
+  confirmRegistration: auth.confirmRegistration,
   checkToken: auth.checkToken,
 
   // company management
