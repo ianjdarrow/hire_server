@@ -108,6 +108,7 @@ exports.confirmRegistration = async (req, res) => {
     `,
       id
     );
+    user.token = util.signToken(user);
     return res.json({ user });
   }
   return res.status(401).json({ error: "Error confirming account" });
