@@ -29,33 +29,20 @@ exports.validateToken = async (req, res, next) => {
       const claims = await db.get(
         `
         SELECT
-          email,
-          hasRegistered,
-          companyId
-        FROM users
-        WHERE email = ?;
+          u.email,
+          u.title,
+          u.name,
+          u.isAdministrator,
+          u.hasRegistered,
+          c.id AS companyId,
+          c.name AS companyName
+        FROM users u
+        LEFT JOIN companies c
+        ON u.companyId = c.id
+        WHERE u.email = ?;
       `,
         email
       );
-      //   `
-      //   SELECT
-      //     u.id,
-      //     u.email,
-      //     u.title,
-      //     u.firstName,
-      //     u.lastName,
-      //     u.isAdministrator,
-      //     u.hasRegistered,
-      //     c.id AS companyId,
-      //     c.name AS companyName,
-      //     c.hasProvidedData
-      //   FROM users u
-      //   INNER JOIN companies c
-      //   ON u.companyId = c.id
-      //   WHERE u.email = ?;
-      // `,
-      //   email
-      // );
       const newToken = util.signToken(claims);
       req.user = { token: newToken, ...claims };
     }

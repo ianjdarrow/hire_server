@@ -1,6 +1,7 @@
 // import controllers
 const auth = require("./auth");
 const companies = require("./companies");
+const users = require("./users");
 const employeeOfferLetter = require("./documents/employeeOfferLetter");
 
 module.exports = {
@@ -10,6 +11,9 @@ module.exports = {
   sendRegistrationLink: auth.sendRegistrationLink,
   confirmRegistration: auth.confirmRegistration,
   checkToken: auth.checkToken,
+
+  // user management
+  setUserInfo: users.setUserInfo,
 
   // company management
   createCompany: companies.createCompany,

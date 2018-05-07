@@ -24,32 +24,21 @@ exports.comparePassword = (candidate, hash) => {
 exports.getUser = email => {
   return new Promise(async res => {
     const db = await dbPromise;
-    // const claims = await db.get(
-    //   `
-    //   SELECT
-    //     u.id,
-    //     u.email,
-    //     u.passwordHash,
-    //     u.title,
-    //     u.firstName,
-    //     u.lastName,
-    //     u.isAdministrator,
-    //     u.hasRegistered,
-    //     c.id AS companyId,
-    //     c.name AS companyName,
-    //     c.hasProvidedData
-    //   FROM users u
-    //   INNER JOIN companies c
-    //   ON u.companyId = c.id
-    //   WHERE u.email = ?;
-    // `,
-    //   email
-    // );
     const claims = await db.get(
       `
-      SELECT email, passwordHash, hasRegistered
-      FROM users
-      WHERE email = ?
+      SELECT
+        u.email,
+        u.passwordHash,
+        u.title,
+        u.name,
+        u.isAdministrator,
+        u.hasRegistered,
+        c.id AS companyId,
+        c.name AS companyName
+      FROM users u
+      LEFT JOIN companies c
+      ON u.companyId = c.id
+      WHERE u.email = ?;
     `,
       email
     );

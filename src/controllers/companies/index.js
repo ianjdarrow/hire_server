@@ -13,79 +13,55 @@ const mail = require("../../mail");
 // Create a new company and its owner/user, all at once.
 //
 const createCompanySchema = joi.object().keys({
-  email: joi
-    .string()
-    .email()
-    .required(),
-  password: joi
-    .string()
-    .required()
-    .min(8),
-  companyName: joi
-    .string()
-    .required()
-    .min(5)
+  companyName: joi.string().required(),
+  entityType: joi.string().required(),
+  state: joi.string().required(),
+  hasStockPlan: joi.string().required(),
+  stockPlanName: joi.string().allow(""),
+  logo: joi.string().allow("")
 });
 
 exports.createCompany = async (req, res) => {
   const validate = joi.validate(req.body, createCompanySchema);
   if (validate.error) {
-    return res.status(400).json({});
+    return res.status(400).json({ error: "schema_error" });
   }
-  const { email, password, companyName } = req.body;
   const db = await dbPromise;
-  // TODO: verification for attempts to register known companies
-  // without company email address?
-  const pwHash = await util.hashPassword(password);
-  const normalizedEmail = email.trim().toLowerCase();
-  const registrationLink = uuid.uuid();
-
-  const createUser = await db.run(
-    `INSERT INTO users(
-        email,
-        passwordHash,
-        isAdministrator,
-        isActive,
-        hasRegistered,
-        registrationLink
-      ) VALUES(?,?,?,?,?,?)`,
-    normalizedEmail,
-    pwHash,
-    1,
-    1,
-    0,
-    registrationLink
-  );
-  if (!createUser.lastID) {
-    return res.status(401).json({ error: "Error creating user" });
-  }
-
-  // create company
-  const normalizedCompanyName = companyName.trim();
-  const createCompany = await db.run(
+  const newCompany = await db.run(
     `INSERT INTO companies(
-        name,
-        accountLevel,
-        owner
-      ) VALUES (?,?,?)`,
-    normalizedCompanyName,
-    "trial",
-    createUser.lastID
+    name,
+    entityType,
+    stateFull,
+    hasStockPlan,
+    stockPlanName,
+    logo,
+    owner
+  ) VALUES (?,?,?,?,?,?, (SELECT id FROM users WHERE email = ?))
+    `,
+    req.body.companyName,
+    req.body.entityType,
+    req.body.state,
+    req.body.hasStockPlan,
+    req.body.stockPlanName,
+    req.body.logo,
+    req.user.email
   );
-  if (!createCompany.lastID) {
-    return res.status(401).json({ error: "Error creating company" });
-  }
-  // flag user as associated with company
-  const setOwner = await db.run(
-    `UPDATE users SET companyId = ? WHERE id = ?`,
-    createCompany.lastID,
-    createUser.lastID
+  if (!newCompany.changes)
+    return res.status(500).json({ error: "Error creating company" });
+  const associateUser = await db.run(
+    `
+  UPDATE users
+  SET companyId = ?
+  WHERE email = ?
+  `,
+    newCompany.lastID,
+    req.user.email
   );
-  if (!setOwner.lastID) {
-    return res.status(500).json({ error: "Error registering company" });
-  }
-  mail.sendAccountConfirmationEmail({ email, registrationLink });
-  return auth.login(req, res);
+  if (!associateUser.changes)
+    return res
+      .status(500)
+      .json({ error: "Error associating user with company" });
+  return res.json({});
 };
 
 //

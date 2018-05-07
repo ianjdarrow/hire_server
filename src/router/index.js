@@ -14,8 +14,11 @@ router.get("/send-registration-link", controllers.sendRegistrationLink);
 router.get("/confirm-registration/:id", controllers.confirmRegistration);
 router.get("/check-token", mw.requireUser, controllers.checkToken);
 
+// user management
+router.post("/user", mw.requireUser, controllers.setUserInfo);
+
 // company management
-router.post("/create-company", controllers.createCompany);
+router.post("/create-company", mw.requireUser, controllers.createCompany);
 router
   .route("/company-info")
   .get(mw.requireUser, controllers.getCompanyInfo)

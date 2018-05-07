@@ -71,10 +71,10 @@ exports.signup = async (req, res) => {
       return res.status(401).json({ error: "Unable to create account" });
     }
     const registrationLinkURL = genRegistrationLink(registrationLink);
-    mail.sendAccountConfirmationEmail({
-      email,
-      registrationLink: registrationLinkURL
-    });
+    // mail.sendAccountConfirmationEmail({
+    //   email,
+    //   registrationLink: registrationLinkURL
+    // });
     const user = await util.getUser(email);
     const { passwordHash, ...userSanitized } = user;
     const token = util.signToken(userSanitized);
