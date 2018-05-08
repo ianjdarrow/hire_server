@@ -3,6 +3,7 @@
     “Helvetica Neue”, Helvetica, Arial, sans-serif;
   line-height: 1.5rem;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   color: #222;
   margin: 0;
   padding: 0;
@@ -14,4 +15,37 @@
   padding-bottom: 4rem;
   color: white;
   width: 100%;
+}
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-weight: 500;
+  line-height: 1.4;
+}
+p {
+  line-height: 1.4;
+}
+button {
+  display: inline-block;
+  font-weight: 600;
+  padding: 1rem 2rem 1rem 2rem;
+  -moz-background-clip: padding;
+  -webkit-background-clip: padding;
+  background-clip: padding-box;
+  background: rgba(255, 255, 255, 0);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0.25rem;
+  color: white;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  margin-bottom: 1rem;
+  transition: all 0.2s ease-in-out;
+}
+button:hover {
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
