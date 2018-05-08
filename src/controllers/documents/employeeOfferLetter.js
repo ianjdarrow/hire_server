@@ -13,18 +13,30 @@ const offerLetterTemplate = pug.compileFile(
   path.join(process.cwd(), "src/templates/OfferLetter.pug")
 );
 
-// todo: finish this schema and implement
+exports.initializeOfferLetter = async (req, res) => {
+  const { companyId, email } = req.user;
+  const documentId = uuid.uuid();
+  const db = await dbPromise;
+  const initialize = await db.run(
+    `
+    INSERT INTO offers (previewURL, companyId, owner)
+    VALUES (?,?, (SELECT id FROM users WHERE email = ?))
+  `,
+    documentId,
+    companyId,
+    email
+  );
+  console.log(initialize);
+  res.json({ documentId });
+};
+
 const generateOfferLetterSchema = joi.object().keys({
   company: joi
     .number()
     .integer()
     .required(),
   companyName: joi.string().required(),
-  state: joi
-    .string()
-    .min(2)
-    .max(2)
-    .required(),
+  state: joi.string().required(),
   stateFull: joi.string().required(),
   logo: joi.string().optional(),
   stockPlanName: joi.string().required(),
@@ -38,10 +50,7 @@ const generateOfferLetterSchema = joi.object().keys({
     .string()
     .email()
     .required(),
-  jobTitle: joi
-    .string()
-    .min(2)
-    .required(),
+  jobTitle: joi.string().required(),
   payUnit: joi.string().required(),
   payRate: joi.number().required(),
   equityType: joi.string().required(),

@@ -24,6 +24,7 @@ module.exports = {
   offerTemplateSearch: companies.offerTemplateSearch,
 
   // offer letter management
+  initializeOfferLetter: employeeOfferLetter.initializeOfferLetter,
   generateOfferLetter: employeeOfferLetter.generateOfferLetter,
   getOfferLetter: employeeOfferLetter.getOfferLetter,
   confirmOfferLetter: employeeOfferLetter.confirmOfferLetter,

@@ -27,6 +27,11 @@ router.get("/pending-offers", mw.requireUser, controllers.getPendingOffers);
 router.get("/feed", mw.requireUser, controllers.getCompanyFeed);
 
 // offer letter generation and utilities
+router.get(
+  "/initialize-offer-letter",
+  mw.requireUser,
+  controllers.initializeOfferLetter
+);
 router.post(
   "/generate-offer-letter",
   mw.requireUser,
