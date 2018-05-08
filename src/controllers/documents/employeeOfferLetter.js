@@ -15,44 +15,72 @@ const offerLetterTemplate = pug.compileFile(
 
 exports.initializeOfferLetter = async (req, res) => {
   const { companyId, email } = req.user;
-  const documentId = uuid.uuid();
   const db = await dbPromise;
+  const existing = await db.get(
+    `
+    SELECT previewURL
+    FROM offers
+    WHERE initialized = 0
+    AND companyId = ?
+    `,
+    companyId
+  );
+  if (existing) return res.json({ previewURL: existing.previewURL });
+
+  const previewURL = uuid.uuid();
   const initialize = await db.run(
     `
     INSERT INTO offers (previewURL, companyId, owner)
     VALUES (?,?, (SELECT id FROM users WHERE email = ?))
   `,
-    documentId,
+    previewURL,
     companyId,
     email
   );
   console.log(initialize);
-  res.json({ documentId });
+
+  res.json({ previewURL });
 };
 
 const generateOfferLetterSchema = joi.object().keys({
-  company: joi
-    .number()
-    .integer()
-    .required(),
+  companyId: joi.number().integer(),
   companyName: joi.string().required(),
-  state: joi.string().required(),
   stateFull: joi.string().required(),
-  logo: joi.string().optional(),
-  stockPlanName: joi.string().required(),
+  logo: joi.string().allow(""),
+  stockPlanName: joi
+    .string()
+    .required()
+    .allow(null),
   owner: joi
     .number()
     .integer()
     .required(),
-  firstName: joi.string().required(),
-  lastName: joi.string().required(),
+  firstName: joi
+    .string()
+    .required()
+    .allow(""),
+  lastName: joi
+    .string()
+    .required()
+    .allow(""),
   email: joi
     .string()
     .email()
-    .required(),
-  jobTitle: joi.string().required(),
+    .required()
+    .allow(""),
+  jobTitle: joi
+    .string()
+    .required()
+    .allow(""),
   payUnit: joi.string().required(),
-  payRate: joi.number().required(),
+  payRate: joi
+    .number()
+    .required()
+    .allow(null),
+  equityGrant: joi
+    .string()
+    .required()
+    .allow(null),
   equityType: joi.string().required(),
   equityAmount: joi
     .number()
@@ -61,16 +89,34 @@ const generateOfferLetterSchema = joi.object().keys({
   vesting: joi.string().optional(),
   fulltime: joi.string().required(),
   hasBenefits: joi.string().required(),
-  supervisorName: joi.string().required(),
-  supervisorTitle: joi.string().required(),
+  supervisorName: joi
+    .string()
+    .required()
+    .allow(""),
+  supervisorTitle: joi
+    .string()
+    .required()
+    .allow(""),
   supervisorEmail: joi
     .string()
     .email()
-    .required(),
-  offerDate: joi.string().required(),
+    .required()
+    .allow(""),
+  offerDate: joi
+    .string()
+    .required()
+    .allow(""),
   offerDateFormatted: joi.string().required(),
-  respondBy: joi.string().required(),
+  respondBy: joi
+    .string()
+    .required()
+    .allow(""),
   respondByFormatted: joi.string().required(),
+  startDate: joi
+    .string()
+    .required()
+    .allow(""),
+  startDateFormatted: joi.string().required(),
   previewURL: joi
     .string()
     .uuid()
@@ -81,81 +127,93 @@ const generateOfferLetterSchema = joi.object().keys({
 //
 // generate a new offer letter from the form
 //
-exports.generateOfferLetter = async (req, res) => {
+exports.updateOfferLetter = async (req, res) => {
   // get company data from user auth info
-  if (!req.user)
-    return res.status(401).json({ error: "This route is authenticated" });
-  let offer = req.body.offer;
-  let user = req.user;
+  let offer = req.body.form;
+  let { email } = req.user;
   const db = await dbPromise;
   const company = await db.get(
     `
     SELECT
-      c.id as company,
       c.name as companyName,
       c.state,
       c.stateFull,
       c.logo,
       c.stockPlanName,
+      u.companyId,
       u.id as owner
     FROM users u
     INNER JOIN companies c
     ON u.companyId = c.id
     WHERE u.email = ?
   `,
-    user.email.toLowerCase()
+    email
   );
   // build offer letter object
   offer = {
-    ...company,
     ...offer,
-    previewURL: uuid.uuid(),
+    ...company,
     status: "preview",
-    offerDateFormatted: format(offer.offerDate, "MMMM D, YYYY"),
-    respondByFormatted: format(offer.respondBy, "MMMM D, YYYY")
+    offerDate: new Date().toLocaleString(),
+    offerDateFormatted: format(new Date(), "MMMM D, YYYY"),
+    respondByFormatted: format(offer.respondBy, "MMMM D, YYYY"),
+    startDateFormatted: format(offer.startDate, "MMMM D, YYYY")
   };
-  validate = joi.validate(offer, generateOfferLetterSchema);
+  validate = joi.validate(offer, generateOfferLetterSchema, {
+    allowUnknown: true
+  });
   if (validate.error) {
+    console.log(validate.error);
     return res.status(400).json({});
   }
-  offer.html = offerLetterTemplate({ offer });
-  offer.htmlHash = util.crypto.hash(offer.html);
-
+  // offer.html = offerLetterTemplate({ offer });
+  // offer.htmlHash = util.crypto.hash(offer.html);
+  const hasContent =
+    offer.firstName ||
+    offer.lastName ||
+    offer.email ||
+    offer.title ||
+    offer.equityGrant ||
+    offer.supervisorName ||
+    offer.supervisorTitle ||
+    offer.supervisorEmail;
   // add to DB
   await db.run(
     `
-    INSERT INTO offers(
-      status,
-      owner,
-      company,
-      companyName,
-      firstName,
-      lastName,
-      email,
-      jobTitle,
-      payUnit,
-      payRate,
-      equityType,
-      equityAmount,
-      vesting,
-      fulltime,
-      hasBenefits,
-      supervisorName,
-      supervisorTitle,
-      supervisorEmail,
-      offerDate,
-      offerDateFormatted,
-      respondBy,
-      respondByFormatted,
-      html,
-      htmlHash,
-      status,
-      previewURL
-    )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    UPDATE offers
+    SET
+      initialized = ?,
+      status = ?,
+      owner = ?,
+      companyId = ?,
+      companyName = ?,
+      firstName = ?,
+      lastName = ?,
+      email = ?,
+      jobTitle = ?,
+      payUnit = ?,
+      payRate = ?,
+      equityGrant = ?,
+      equityType = ?,
+      equityAmount = ?,
+      vesting = ?,
+      fulltime = ?,
+      hasBenefits = ?,
+      supervisorName = ?,
+      supervisorTitle = ?,
+      supervisorEmail = ?,
+      offerDate = ?,
+      offerDateFormatted = ?,
+      respondBy = ?,
+      respondByFormatted = ?,
+      startDate = ?,
+      startDateFormatted = ?,
+      status = ?
+    WHERE previewURL = ?`,
+    hasContent ? 1 : 0,
     offer.status,
     offer.owner,
-    offer.company,
+    offer.companyId,
     offer.companyName,
     offer.firstName,
     offer.lastName,
@@ -163,6 +221,7 @@ exports.generateOfferLetter = async (req, res) => {
     offer.jobTitle,
     offer.payUnit,
     offer.payRate,
+    offer.equityGrant,
     offer.equityType,
     offer.equityAmount,
     offer.vesting,
@@ -175,35 +234,35 @@ exports.generateOfferLetter = async (req, res) => {
     offer.offerDateFormatted,
     offer.respondBy,
     offer.respondByFormatted,
-    offer.html,
-    offer.htmlHash,
+    offer.startDate,
+    offer.startDateFormatted,
     offer.status,
     offer.previewURL
   );
-  await db.run(
-    `
-    INSERT INTO offerEvents(
-      priority,
-      eventType,
-      eventURL,
-      signatureData,
-      eventDataHash,
-      userId,
-      userIpAddress,
-      documentId,
-      companyId
-    ) VALUES (?,?,?,?,?,?,?,?,?)
-  `,
-    2,
-    "offer_letter_created",
-    req.originalUrl,
-    offer.html,
-    util.crypto.hash(offer.html),
-    offer.owner,
-    "fake address",
-    offer.id,
-    offer.company
-  );
+  // await db.run(
+  //   `
+  //   INSERT INTO offerEvents(
+  //     priority,
+  //     eventType,
+  //     eventURL,
+  //     signatureData,
+  //     eventDataHash,
+  //     userId,
+  //     userIpAddress,
+  //     documentId,
+  //     companyId
+  //   ) VALUES (?,?,?,?,?,?,?,?,?)
+  // `,
+  //   2,
+  //   "offer_letter_created",
+  //   req.originalUrl,
+  //   offer.html,
+  //   util.crypto.hash(offer.html),
+  //   offer.owner,
+  //   "fake address",
+  //   offer.id,
+  //   offer.company
+  // );
 
   // reply with offer letter object
   return res.json({
@@ -248,43 +307,43 @@ exports.getOfferLetter = async (req, res) => {
     id
   );
   if (!letter) return res.status(404).json({});
-  const event = {
-    priority: 3,
-    eventType: "offer_letter_viewed",
-    eventURL: req.originalUrl,
-    documentId: letter.id,
-    eventDataHash: util.crypto.hash(letter.html),
-    // todo: IP logging
-    userIpAddress: util.getIpAddress(req),
-    companyId: letter.company
-  };
-  const validate = joi.validate(event, offerEventsSchema, {
-    allowUnknown: true
-  });
-  if (validate.error)
-    return res
-      .status(500)
-      .json({ error: "Issue logging access, Support team has been notified." });
-  await db.run(
-    `
-    INSERT INTO offerEvents(
-      priority,
-      eventType,
-      eventURL,
-      documentID,
-      eventDataHash,
-      userIpAddress,
-      companyId
-    ) VALUES (?,?,?,?,?,?,?)
-    `,
-    event.priority,
-    event.eventType,
-    event.eventURL,
-    event.documentID,
-    event.eventDataHash,
-    event.userIpAddress,
-    event.companyId
-  );
+  // const event = {
+  //   priority: 3,
+  //   eventType: "offer_letter_viewed",
+  //   eventURL: req.originalUrl,
+  //   documentId: letter.id,
+  //   eventDataHash: util.crypto.hash(letter.html),
+  //   // todo: IP logging
+  //   userIpAddress: util.getIpAddress(req),
+  //   companyId: letter.company
+  // };
+  // const validate = joi.validate(event, offerEventsSchema, {
+  //   allowUnknown: true
+  // });
+  // if (validate.error)
+  //   return res
+  //     .status(500)
+  //     .json({ error: "Issue logging access, Support team has been notified." });
+  // await db.run(
+  //   `
+  //   INSERT INTO offerEvents(
+  //     priority,
+  //     eventType,
+  //     eventURL,
+  //     documentID,
+  //     eventDataHash,
+  //     userIpAddress,
+  //     companyId
+  //   ) VALUES (?,?,?,?,?,?,?)
+  //   `,
+  //   event.priority,
+  //   event.eventType,
+  //   event.eventURL,
+  //   event.documentID,
+  //   event.eventDataHash,
+  //   event.userIpAddress,
+  //   event.companyId
+  // );
   // never let signer IDs hit the wire unless intended – allows for bad signing!
   const { previewURL, companyURL, employeeURL, ...cleanLetter } = letter;
   if (id === previewURL) cleanLetter.previewURL = previewURL;

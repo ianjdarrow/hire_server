@@ -25,7 +25,7 @@ module.exports = {
 
   // offer letter management
   initializeOfferLetter: employeeOfferLetter.initializeOfferLetter,
-  generateOfferLetter: employeeOfferLetter.generateOfferLetter,
+  updateOfferLetter: employeeOfferLetter.updateOfferLetter,
   getOfferLetter: employeeOfferLetter.getOfferLetter,
   confirmOfferLetter: employeeOfferLetter.confirmOfferLetter,
   signOfferLetter: employeeOfferLetter.signOfferLetter,

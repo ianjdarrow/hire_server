@@ -28,7 +28,7 @@ exports.sendAccountConfirmationEmail = async params => {
       },
       content: {
         from: {
-          name: "QuickSend Account Management",
+          name: "QuickSend",
           email: "notifications@mail.quicksend.io"
         },
         subject: "QuickSend Registration",

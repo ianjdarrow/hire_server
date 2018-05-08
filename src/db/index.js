@@ -42,6 +42,7 @@ const initDB = async () => {
   const createOffersTable = `
     CREATE TABLE IF NOT EXISTS offers(
       id INTEGER PRIMARY KEY,
+      initialized INTEGER DEFAULT 0,
       companyId INTEGER,
       companyName TEXT,
       owner INTEGER,
@@ -56,6 +57,7 @@ const initDB = async () => {
       jobTitle TEXT,
       payUnit TEXT,
       payRate INTEGER,
+      equityGrant TEXT,
       equityType TEXT,
       equityAmount INTEGER,
       vesting TEXT,
@@ -68,6 +70,8 @@ const initDB = async () => {
       offerDateFormatted TEXT,
       respondBy TEXT,
       respondByFormatted TEXT,
+      startDate, TEXT,
+      startDateFormatted TEXT,
       previewURL TEXT,
       companyURL TEXT,
       companySignature TEXT,

@@ -33,9 +33,9 @@ router.get(
   controllers.initializeOfferLetter
 );
 router.post(
-  "/generate-offer-letter",
+  "/update-offer-letter",
   mw.requireUser,
-  controllers.generateOfferLetter
+  controllers.updateOfferLetter
 );
 router.get(
   "/offer-template-search",
